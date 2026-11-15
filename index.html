@@ -151,6 +151,7 @@ select{width:100%;background:var(--inp);color:var(--tx);border:1px solid var(--l
       <label class="file">📂 Importa GPX/KML<input type="file" id="gpxIn"></label>
       <button id="gmBtn">🔗 Da Google Maps</button>
       <button id="passBtn">🏔️ Passi di montagna</button>
+      <button id="tapBtn">✋ Tappe sulla mappa</button>
     </div>
     <div id="gmBox" style="display:none;margin-bottom:10px">
       <input type="text" id="gmUrl" placeholder="Incolla qui il link del percorso Google Maps">
@@ -193,7 +194,7 @@ select{width:100%;background:var(--inp);color:var(--tx);border:1px solid var(--l
 
   <div class="foot">
     Mappe © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · Percorsi: Valhalla (profilo moto, server FOSSGIS) e OSRM (Open Source Routing Machine) · Ricerca luoghi: Photon · Meteo: <a href="https://open-meteo.com/">Open-Meteo</a> (modelli ECMWF/ICON/GFS).<br>
-    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">Versione 15 nov 2026 · rilascio 8 (cerca distributori nell’app)</b>
+    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">Versione 15 nov 2026 · rilascio 9 (distributori affidabili, tappe sulla mappa)</b>
   </div>
 </main>
 </div>
@@ -369,7 +370,22 @@ L.control.zoom({position:'bottomright'}).addTo(map);
 const layer=L.layerGroup().addTo(map);
 
 /* ================= tappe + autocomplete ================= */
-function renderStops(){
+/* ===== tappe toccando la mappa (percorso libero) e spostabili trascinando ===== */
+let stopLayer=null;
+async function revName(lat,lon){try{const r=await fetch(`https://photon.komoot.io/reverse?lat=${lat.toFixed(5)}&lon=${lon.toFixed(5)}`);const j=await r.json();const f=(j.features||[])[0];if(f)return placeName(f.properties);}catch(e){}return `Punto ${lat.toFixed(4)}, ${lon.toFixed(4)}`;}
+function drawStopMarkers(){try{if(!stopLayer)stopLayer=L.layerGroup().addTo(map);stopLayer.clearLayers();
+  S.stops.forEach((x,i)=>{if(!x.p)return;const last=i===S.stops.length-1;
+    const lab=i===0?'P':last?'🏁':String(i);
+    const mk=L.marker([x.p.lat,x.p.lon],{draggable:S.mode!=='gpx',icon:L.divIcon({className:'',html:`<div style="min-width:26px;height:26px;padding:0 4px;border-radius:13px;background:${i===0?'#1fa855':last?'#111':'#f26b00'};color:#fff;border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px">${lab}</div>`,iconSize:[30,26],iconAnchor:[15,13]})})
+      .bindTooltip(esc((x.p.name||'').split(',')[0]));
+    mk.on('dragend',async ev=>{const ll=ev.target.getLatLng();x.p={lat:ll.lat,lon:ll.lng,name:'…'};renderStops();x.p.name=await revName(ll.lat,ll.lng);x.text=x.p.name;renderStops();toast('Tappa spostata: ricalcola il percorso');});
+    mk.addTo(stopLayer);});}catch(e){}}
+function setTapMode(on){S.tapMode=on;const b=$('#tapBtn');if(b){b.classList.toggle('okb',on);b.textContent=on?'✋ Tocca la mappa… (fine)':'✋ Tappe sulla mappa';}
+  if(on){toast('Tocca la mappa per aggiungere tappe; trascina i numeri per spostarle');window.scrollTo({top:0,behavior:'smooth'});}}
+map.on('click',async e=>{if(!S.tapMode)return;const ll=e.latlng;const p={lat:ll.lat,lon:ll.lng,name:'…'};
+  let i;if(!S.stops[0].p)i=0;else if(!S.stops[S.stops.length-1].p)i=S.stops.length-1;else{i=bestInsert([ll.lat,ll.lng]);S.stops.splice(i,0,{p:null,text:''});}
+  S.stops[i].p=p;renderStops();p.name=await revName(ll.lat,ll.lng);S.stops[i].text=p.name;renderStops();toast('Tappa aggiunta: '+p.name.split(',')[0]);});
+function renderStops(){setTimeout(drawStopMarkers,0);
   const box=$('#stops');box.innerHTML='';
   S.stops.forEach((s,i)=>{
     const last=i===S.stops.length-1, first=i===0;
@@ -456,6 +472,15 @@ async function osrm(pts,alts,exclude){
   return j.routes.map(rt=>{const names=new Set();(rt.legs||[]).forEach(l=>(l.steps||[]).forEach(st=>{[st.name,st.ref].forEach(n=>{if(n)String(n).split(/[;,]/).forEach(x=>{x=x.trim().toLowerCase();if(x)names.add(x);});});}));
     return {coords:rt.geometry.coordinates.map(c=>[c[1],c[0]]),dist:rt.distance,dur:rt.duration,names:[...names]};});
 }
+/* Overpass (OpenStreetMap) con server di riserva: se uno è occupato provo il successivo */
+const OVP=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter','https://maps.mail.ru/osm/tools/overpass/api/interpreter','https://overpass.private.coffee/api/interpreter'];
+async function overpass(q,ms){let last;
+  for(const u of OVP){const ctl=new AbortController();const tm=setTimeout(()=>ctl.abort(),ms||45000);
+    try{const r=await fetch(u,{method:'POST',body:'data='+encodeURIComponent(q),headers:{'Content-Type':'application/x-www-form-urlencoded'},signal:ctl.signal});
+      if(!r.ok)throw new Error('HTTP '+r.status);const j=await r.json();
+      if(j.remark&&/runtime error|timed out|out of memory/i.test(j.remark)&&!(j.elements||[]).length)throw new Error(j.remark);return j;}
+    catch(e){last=e;console.warn('Overpass',u,e);}finally{clearTimeout(tm);}}
+  throw last||new Error('Overpass non raggiungibile');}
 /* motore principale: Valhalla (FOSSGIS, gratuito) con profilo MOTO e preferenza autostrade regolabile */
 let ROUTE_PREF={hw:0,toll:false};
 function decPoly(str,prec){const f=Math.pow(10,prec||6);let i=0,lat=0,lng=0;const out=[];
@@ -470,7 +495,7 @@ function vTrip(t){const coords=[];const names=new Set();const man=[];const L2=(t
   return {coords,dist:(t.summary.length||0)*1000,dur:t.summary.time||0,names:[...names],man};}
 async function valhalla(pts,alts,pref,excl){
   const q={locations:pts.map((p,i)=>({lat:+p[0].toFixed(6),lon:+p[1].toFixed(6),type:(i===0||i===pts.length-1)?'break':'through'})),
-    costing:isMoto()?'motorcycle':'auto',costing_options:{[isMoto()?'motorcycle':'auto']:Object.assign({use_highways:pref.hw,use_tolls:pref.toll?0:0.5,use_ferry:0.3},isMoto()?{use_trails:0}:{})},
+    costing:isMoto()?'motorcycle':'auto',costing_options:{[isMoto()?'motorcycle':'auto']:Object.assign({use_highways:pref.hw,use_tolls:pref.toll?0:0.5,use_ferry:0.3},pref.hw===0?{exclude_highways:true}:{},pref.toll?{exclude_tolls:true}:{},isMoto()?{use_trails:0}:{})},
     units:'kilometers',language:'it-IT',directions_options:{units:'kilometers',language:'it-IT'}};
   if(alts&&pts.length===2)q.alternates=2;
   if(excl&&excl.length)q.exclude_locations=excl.map(p=>({lat:+p[0].toFixed(6),lon:+p[1].toFixed(6)}));
@@ -639,7 +664,7 @@ async function calc(){
     status('Scarico le previsioni…');
     await loadWx(S.routes.flatMap(r=>r.samples.map(s=>s.key)));
     S.sel=0;S.dismissed={};DISC.items=[];DISC.state='idle';DISC.sig='';drawDiscLayer();renderAll(true);status('');window.scrollTo({top:0,behavior:'smooth'});
-    checkClosures().then(fetchFuel);
+    fetchFuel().then(checkClosures);
     showTab('routes');
   }catch(e){console.error(e);status('');toast('Errore: '+(e.message||'rete non disponibile'));}
   finally{btn.disabled=false;status(S.routes.length?'':'');}
@@ -706,8 +731,7 @@ async function checkClosures(){
     const al=lines.map(pts=>pts.map(p=>p[0].toFixed(5)+','+p[1].toFixed(5)).join(','));
     const sel=['["highway"="construction"]','["highway"]["access"="no"]','["highway"]["motor_vehicle"="no"]','["highway"]["motorcycle"="no"]','["highway"]["access:conditional"]','["highway"]["motor_vehicle:conditional"]','["highway"]["vehicle:conditional"]'];
     const q='[out:json][timeout:25];(\n'+al.map(a=>sel.map(f=>`way(around:30,${a})${f};`).join('\n')).join('\n')+'\n);out tags center 200;';
-    const res=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:'data='+encodeURIComponent(q),headers:{'Content-Type':'application/x-www-form-urlencoded'}});
-    const j=await res.json();
+    const j=await overpass(q);
     const skip=/^(footway|path|cycleway|steps|track|service|bridleway|pedestrian|platform|corridor|proposed|abandoned)$/;
     S.routes.forEach((r,ri)=>{
       const out=[];const seen=new Set();
@@ -789,7 +813,7 @@ function renderAll(fit){setTimeout(()=>{drawSelLayer();renderSelCard();},0);
 }
 function isDanger(p){if(!p||!p.w)return false;const w=p.w;
   return p.ice||[95,96,99].includes(w.code)||w.pr>=0.5||w.wg>=(isMoto()?50:70)||(w.vis!=null&&w.vis<1000)||w.sd>=0.02||(p.sc!=null&&p.sc<40);}
-function drawMap(fit){
+function drawMap(fit){setTimeout(drawStopMarkers,0);
   layer.clearLayers();
   S.routes.forEach((r,i)=>{if(i===S.sel)return;
     L.polyline(r.coords,{color:'#8a93a6',weight:5,opacity:.55}).on('click',()=>selectRoute(i)).addTo(layer);});
@@ -806,6 +830,7 @@ function drawMap(fit){
   });
   try{const mk=(x,col,title)=>L.marker(x.p,{icon:L.divIcon({className:'',html:`<div style="width:24px;height:24px;border-radius:50%;background:${col};border:2px solid #111;display:flex;align-items:center;justify-content:center;font-size:13px">⛽</div>`,iconSize:[24,24],iconAnchor:[12,12]})})
       .bindPopup(`<b>${title}</b><br>${esc(x.synthetic?'Nessun distributore trovato':x.name)}<br>km ${Math.round(x.km)} · ~${fmtT(x.t)}<br>autonomia all’arrivo ${Math.round(x.rangeArr)} km<br>${x.synthetic?`<a href="#" onclick="fuelSearchAt(${x.p[0]},${x.p[1]},'plan');return false">🔍 Cerca distributori qui</a>`:`<a href="${navToUrl(x.p)}" target="_blank" rel="noopener">Portami qui</a>`}`).addTo(layer);
+    (r.fuelSt||[]).forEach(x=>L.circleMarker(x.p,{radius:6,color:'#e60000',weight:2,fillColor:'#fff',fillOpacity:1}).bindPopup(`<b>⛽ ${esc(x.name)}</b><br>km ${Math.round(x.km)} · ${x.off<1000?x.off+' m':(x.off/1000).toFixed(1)+' km'} dal percorso${x.h24?'<br>24h/self':x.oh?'<br>'+esc(x.oh):''}<br><a href="#" onclick="addFuelStop({p:[${x.p[0]},${x.p[1]}],name:'${esc(x.name).replace(/'/g,'’')}'},'plan');return false">➕ Usa come sosta (tappa)</a>`).addTo(layer));
     fuelPlan(r).stops.forEach(x=>{mk(x,'#e60000',x.optional?'Distributore consigliato':'Sosta rifornimento '+x.n);if(x.backup)mk(x.backup,'#29b6ff','Distributore di riserva');});}catch(e){console.warn(e);}
   const c=r.coords;
   L.circleMarker(c[0],{radius:7,color:'#fff',fillColor:'#3ecf6e',fillOpacity:1,weight:2}).addTo(layer);
@@ -849,7 +874,7 @@ function renderRoutes(){
     <div class="kpi"><span class="mut">Costo stimato</span><b>€ ${fp.cost.toFixed(2)}</b><span class="mut">a ${(+SET.moto.price||0).toFixed(2)} €/${V().fuel==='metano'?'kg':'l'}</span></div>
     <div class="kpi"><span class="mut">Autonomia ora</span><b>${Math.round(fp.range)} km</b><span class="mut">pieno: ${Math.round(fp.full)} km</span></div>
     <div class="kpi"><span class="mut">Soste</span><b>${fp.req}</b><span class="mut">${fp.req?'+'+fp.req*10+' min circa':'non necessarie'} · arrivo con ${Math.round(fp.endRange)} km</span></div></div>
-    ${S.fuelState==='loading'?'<div class="mut" style="margin-top:8px">⏳ Cerco i distributori lungo il percorso…</div>':''}
+    ${S.fuelState==='loading'?'<div class="mut" style="margin-top:8px">⏳ Cerco i distributori lungo il percorso…</div>':S.fuelState==='error'?'<div class="note" style="color:var(--r);margin-top:8px">⚠️ Distributori non caricati (server delle mappe occupato).</div><button id="fuelRetry" class="primary" style="margin-top:6px">↻ Riprova a caricare i distributori</button>':S.fuelState==='done'?`<div class="mut" style="margin-top:8px">✅ ${(r.fuelSt||[]).length} distributori trovati lungo il percorso (entro 1,5 km) · tutti visibili sulla mappa</div>`:''}
     ${fp.warn?`<div class="note" style="color:var(--y);margin-top:8px">⚠️ ${fp.warn}</div>`:''}
     <button data-fsearch="route" style="width:100%;margin-top:8px">🔍 Cerca altri distributori vicino al percorso</button>
     ${fp.stops.map(x=>stLine(x,'p')+(x.backup?stLine(x.backup,'b'):'<div class="mut" style="padding-left:34px">Nessun distributore di emergenza vicino</div>')).join('')}
@@ -861,6 +886,7 @@ function renderRoutes(){
     <div class="mut">Google Maps ricostruisce il tragitto passando per 8 punti del percorso scelto; per seguirlo alla lettera usa l’export GPX (GPS Exchange Format) in un navigatore che lo supporta.</div></div>`;
   box.innerHTML=h;
   box.querySelectorAll('.rt').forEach(e=>e.onclick=()=>selectRoute(+e.dataset.i));
+  if($('#fuelRetry'))$('#fuelRetry').onclick=()=>fetchFuel();
   box.querySelectorAll('[data-fsearch]').forEach(e=>e.onclick=ev=>{ev.preventDefault();const v=e.dataset.fsearch;if(v==='route'){const c=map.getCenter();fuelSearchAt(c.lat,c.lng,'plan');}else{const [a,b]=v.split(',').map(Number);fuelSearchAt(a,b,'plan');}});
   bindProposal();
   if($('#useBest')){const b=bestTimes(r).reduce((x,y)=>y.score>x.score?y:x);$('#useBest').onclick=()=>{S.dep=b.dep;setDepInput(b.dep);renderAll(false);toast('Partenza impostata alle '+fmtT(b.dep));};}
@@ -1103,8 +1129,7 @@ async function fuelSearchAt(lat,lon,ctx){
   try{
     for(const R of [5000,12000,25000]){
       const q=`[out:json][timeout:30];(nwr(around:${R},${lat.toFixed(5)},${lon.toFixed(5)})["amenity"="fuel"];nwr(around:${R+600},${lat.toFixed(5)},${lon.toFixed(5)})["highway"~"^(services|rest_area)$"];);out tags center 300;`;
-      const res=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:'data='+encodeURIComponent(q),headers:{'Content-Type':'application/x-www-form-urlencoded'}});
-      const j=await res.json();const el=j.elements||[];
+      const j=await overpass(q);const el=j.elements||[];
       const svc=el.filter(e=>e.tags&&/^(services|rest_area)$/.test(e.tags.highway||'')).map(e=>({p:[e.lat??e.center.lat,e.lon??e.center.lon],name:e.tags.name||'Area di servizio'}));
       found=el.filter(e=>e.tags&&e.tags.amenity==='fuel'&&okF(e.tags)).map(e=>{const t=e.tags,p=[e.lat??e.center.lat,e.lon??e.center.lon];const sv=svc.find(x=>hav(x.p,p)<350);
         const base=t.brand||t.name||t.operator||'';const oh=t.opening_hours||'';
@@ -1160,8 +1185,7 @@ async function loadPasses(area){
   else if(area==='near'){const c=map.getCenter();src=`node(around:80000,${c.lat.toFixed(4)},${c.lng.toFixed(4)})["mountain_pass"="yes"]->.p;`;}
   else src=`area["${area.length===2?'ISO3166-1':'ISO3166-2'}"="${area}"]${area.length===2?'["admin_level"="2"]':''}->.a;node(area.a)["mountain_pass"="yes"]->.p;`;
   const q=`[out:json][timeout:90];${src}way(bn.p)${road}->.w;node.p(w.w)["name"];out body 1500;`;
-  const res=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:'data='+encodeURIComponent(q),headers:{'Content-Type':'application/x-www-form-urlencoded'}});
-  const j=await res.json();
+  const j=await overpass(q);
   const out=(j.elements||[]).map(e=>({name:e.tags.name,ele:parseFloat(e.tags.ele)||null,p:[e.lat,e.lon],key:'n'+e.id}));
   PASSC[area]=out;return out;
 }
@@ -1193,6 +1217,7 @@ function openPasses(){
   $('#psArea').onchange=load;$('#psQ').oninput=draw;$('#psSort').onchange=draw;load();
 }
 $('#passBtn').onclick=openPasses;
+$('#tapBtn').onclick=()=>setTapMode(!S.tapMode);
 
 /* ================= import da link Google Maps ================= */
 $('#gmBtn').onclick=()=>{const b=$('#gmBox');b.style.display=b.style.display==='none'?'block':'none';if(b.style.display==='block')$('#gmUrl').focus();};
@@ -1746,7 +1771,7 @@ async function resumeTrip(){
   try{status('Aggiorno il meteo…');await loadWx(r.samples.map(x=>x.key));}catch(e){}
   status('');renderAll(true);
   await startNav({states:t.nav.states,next:t.nav.next,coords:t.nav.coords,man:t.nav.man});
-  checkClosures().then(fetchFuel);
+  fetchFuel().then(checkClosures);
 }
 function navStartCardUI(){tripCardUI();
   const c=$('#navStartCard');if(!c)return;const r=S.routes[S.sel];
@@ -1832,8 +1857,7 @@ async function discSearch(){
   try{
     const R=DISC.radius*1000;const n=Math.min(400,Math.max(15,Math.round(r.len/(R*0.8))));
     const line=Array.from({length:n+1},(_,k)=>pointAtKm(r,r.len/1000*k/n)).map(p=>p[0].toFixed(5)+','+p[1].toFixed(5)).join(',');
-    const res=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:'data='+encodeURIComponent(poiQuery(line,R)),headers:{'Content-Type':'application/x-www-form-urlencoded'}});
-    const j=await res.json();
+    const j=await overpass(poiQuery(line,R));
     const stopsKm=S.stops.filter(x=>x.p).map(x=>({name:(x.p.name||'').split(',')[0],km:projKm(r,[x.p.lat,x.p.lon]).km}));
     const items=[];const seen=new Set();
     (j.elements||[]).forEach(e=>{
@@ -1974,7 +1998,7 @@ function fuelPlan(r){
   const tAt=km=>S.dep+r.dur*1000*(km/tot)+stops.length*600000;
   const night=t=>{const h=new Date(t).getHours();return h>=20||h<7;};
   const BR=/eni|agip|q8|^ip\b|esso|tamoil|shell|total|api\b|erg/i;
-  const safety=x=>(x.h24?3:0)+(x.services?3:0)+(BR.test(x.name||'')?2:0)+(x.off<120?1:0);
+  const safety=x=>(x.h24?3:0)+(x.services?3:0)+(BR.test(x.name||'')?2:0)+(x.off<150?2:x.off<500?1:x.off>1000?-2:0);
   while(pos+range-M<tot&&guard++<20){
     const limit=pos+range-M;let prim=null;
     if(limit<=pos+2){prim=st.find(x=>x.km>pos+0.5)||null;warn='Autonomia già vicina al margine: fai rifornimento al primo distributore.';}
@@ -2015,11 +2039,11 @@ function projKm(r,p){ // distanza dal percorso e km lungo il percorso
 async function fetchFuel(){
   if(!S.routes.length)return;S.fuelState='loading';renderRoutes();
   try{
-    const lines=S.routes.map(r=>{const n=Math.min(300,Math.max(20,Math.round(r.len/500)));const pts=[];
-      for(let k=0;k<=n;k++){pts.push(pointAtKm(r,r.len/1000*k/n));}return pts.map(p=>p[0].toFixed(5)+','+p[1].toFixed(5)).join(',');});
-    const q='[out:json][timeout:30];(\n'+lines.map(a=>`nwr(around:400,${a})["amenity"="fuel"];nwr(around:600,${a})["highway"~"^(services|rest_area)$"];`).join('\n')+'\n);out tags center 900;';
-    const res=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:'data='+encodeURIComponent(q),headers:{'Content-Type':'application/x-www-form-urlencoded'}});
-    const j=await res.json();
+    const boxes=[];S.routes.forEach(r=>{const bx={};r.coords.forEach((p,i)=>{const k=Math.floor(r.cum[i]/15000);const b=bx[k]=bx[k]||[90,180,-90,-180];
+        b[0]=Math.min(b[0],p[0]);b[1]=Math.min(b[1],p[1]);b[2]=Math.max(b[2],p[0]);b[3]=Math.max(b[3],p[1]);});
+      Object.values(bx).forEach(b=>boxes.push([b[0]-0.015,b[1]-0.02,b[2]+0.015,b[3]+0.02].map(v=>v.toFixed(4)).join(',')));});
+    const q='[out:json][timeout:60];(\n'+[...new Set(boxes)].map(b=>`nwr["amenity"="fuel"](${b});nwr["highway"~"^(services|rest_area)$"](${b});`).join('\n')+'\n);out tags center 4000;';
+    const j=await overpass(q);
     const svc=(j.elements||[]).filter(e=>e.tags&&/^(services|rest_area)$/.test(e.tags.highway||'')).map(e=>({p:[e.lat??(e.center&&e.center.lat),e.lon??(e.center&&e.center.lon)],name:e.tags.name||(e.tags.highway==='services'?'Area di servizio':'Area di sosta'),brand:e.tags.brand||e.tags.operator||''})).filter(x=>x.p[0]!=null);
     const all=(j.elements||[]).filter(e=>e.tags&&e.tags.amenity==='fuel').map(e=>{const t=e.tags||{};const lat=e.lat??(e.center&&e.center.lat),lon=e.lon??(e.center&&e.center.lon);if(lat==null)return null;
       const sv=svc.find(x=>hav(x.p,[lat,lon])<350);
@@ -2027,10 +2051,10 @@ async function fetchFuel(){
       const base=t.brand||t.name||t.operator||'';const nm=sv?(base&&!sv.name.toLowerCase().includes(base.toLowerCase())?base+' – '+sv.name:sv.name):(base||'Distributore');
       return {p:[lat,lon],name:nm,services:!!sv||/area di servizio|autogrill/i.test(t.name||''),addr:[t['addr:street'],t['addr:city']].filter(Boolean).join(', '),oh,h24,lpg:t['fuel:lpg'],cng:t['fuel:cng'],diesel:t['fuel:diesel'],o95:t['fuel:octane_95']};}).filter(Boolean);
     S.routes.forEach(r=>{
-      const out=[];all.forEach(s=>{const pr=projKm(r,s.p);if(pr.d<=450&&!out.some(o=>hav(o.p,s.p)<150))out.push({...s,km:pr.km,off:Math.round(pr.d)});});
+      const out=[];all.forEach(s=>{const pr=projKm(r,s.p);if(pr.d<=1500&&!out.some(o=>hav(o.p,s.p)<120))out.push({...s,km:pr.km,off:Math.round(pr.d)});});
       r.fuelSt=out.sort((a,b)=>a.km-b.km);});
     S.fuelState='done';
-  }catch(e){console.warn(e);S.fuelState='error';toast('Distributori non disponibili ora: soste indicative');}
+  }catch(e){console.warn(e);S.fuelState='error';toast('Server mappe occupato: distributori non caricati. Tocca “Riprova” nella scheda carburante.');}
   renderAll(false);
 }
 const navToUrl=p=>`https://www.google.com/maps/dir/?api=1&destination=${p[0].toFixed(5)},${p[1].toFixed(5)}&travelmode=driving`;
