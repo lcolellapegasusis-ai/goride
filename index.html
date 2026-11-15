@@ -194,7 +194,7 @@ select{width:100%;background:var(--inp);color:var(--tx);border:1px solid var(--l
 
   <div class="foot">
     Mappe © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · Percorsi: Valhalla (profilo moto, server FOSSGIS) e OSRM (Open Source Routing Machine) · Ricerca luoghi: Photon · Meteo: <a href="https://open-meteo.com/">Open-Meteo</a> (modelli ECMWF/ICON/GFS).<br>
-    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">Versione 15 nov 2026 · rilascio 10 (soste carburante entro ±20 km sul percorso)</b>
+    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">Versione 15 nov 2026 · rilascio 11 (soste tra 150 e 200 km, distributori ufficiali MIMIT)</b>
   </div>
 </main>
 </div>
@@ -272,7 +272,8 @@ select{width:100%;background:var(--inp);color:var(--tx);border:1px solid var(--l
       <label class="fld">Carburante<select id="vfFuel"><option value="benzina">Benzina</option><option value="diesel">Diesel</option><option value="gpl">GPL</option><option value="metano">Metano</option></select></label>
       <label class="fld">Serbatoio (litri; kg per il metano)<input type="number" id="vfTank" step="0.1" inputmode="decimal"></label>
       <label class="fld">Autonomia con il pieno (km)<input type="number" id="vfAuto" step="5" inputmode="numeric"></label>
-      <label class="fld">Autonomia minima da conservare (km)<input type="number" id="vfMargin" step="10" inputmode="numeric"></label>
+      <div class="grid2"><label class="fld">Rifornisci dopo almeno (km)<input type="number" id="vfRefMin" step="10" inputmode="numeric"></label><label class="fld">…e al massimo (km)<input type="number" id="vfRefMax" step="10" inputmode="numeric"></label></div>
+      <div class="grid2"><label class="fld">Tolleranza ± (km)<input type="number" id="vfTol" step="5" inputmode="numeric"></label><label class="fld">Riserva minima assoluta (km)<input type="number" id="vfMargin" step="5" inputmode="numeric"></label></div>
       <label class="fld">Prezzo carburante (€/l, €/kg per il metano)<input type="number" id="vfPrice" step="0.01" inputmode="decimal"></label>
       <div class="note">I dati dell’elenco sono indicativi: correggili con quelli del libretto o del cruscotto.</div>
       <div class="grid2" style="margin-top:8px"><button id="vfSave" class="okb" style="padding:11px;border-radius:10px">Salva veicolo</button><button id="vfCancel">Annulla</button></div>
@@ -867,18 +868,18 @@ function renderRoutes(){
   const stLine=(x,kind)=>`<div style="display:flex;gap:8px;align-items:flex-start;padding:8px 0;${kind==='p'?'border-top:1px solid var(--line)':''}">
      <div style="width:26px;height:26px;border-radius:50%;background:${kind==='p'?'#e60000':'#29b6ff'};display:flex;align-items:center;justify-content:center;flex:none;font-size:14px">⛽</div>
      <div style="flex:1"><b>${kind==='p'?(x.optional?'Distributore consigliato':'Sosta '+x.n):'Riserva'}${x.synthetic?'':': '+esc(x.name)}</b>${x.synthetic?' <span style="color:var(--r)">– nessun distributore trovato qui</span>':''}
-     <div class="mut">km ${Math.round(x.km)} · ~${fmtT(x.t)} · autonomia all’arrivo <b style="color:${kind==='p'&&x.rangeArr<fp.M?'var(--r)':'inherit'}">${Math.round(x.rangeArr)} km</b>${x.off>100?' · '+(x.off<1000?x.off+' m':(x.off/1000).toFixed(1)+' km')+(x.detour?' di deviazione (andata)':' dal percorso'):''}${x.h24?' · 24h/self':x.oh?' · orari: '+esc(x.oh):''}</div>
+     <div class="mut">km ${Math.round(x.km)} · ~${fmtT(x.t)} · autonomia all’arrivo <b style="color:${kind==='p'&&x.rangeArr<fp.M?'var(--r)':'inherit'}">${Math.round(x.rangeArr)} km</b>${x.off>100?' · '+(x.off<1000?x.off+' m':(x.off/1000).toFixed(1)+' km')+(x.detour?' di deviazione (andata)':' dal percorso'):''}${priceOf(x)?' · <b>'+priceOf(x)+'</b>':''}${x.h24?' · 24h/self':x.oh?' · orari: '+esc(x.oh):''}</div>
      ${x.synthetic?`<a href="#" data-fsearch="${x.p[0]},${x.p[1]}" style="color:var(--acc);font-size:13px;font-weight:700">🔍 cerca distributori qui (nella mappa dell’app)</a>`:`<a href="${navToUrl(x.p)}" target="_blank" rel="noopener" style="color:var(--acc);font-size:13px">portami qui</a>`}</div></div>`;
   h+=`<div class="card"><h3>⛽ Carburante e soste · ${KIND_IC[V().kind]||''} ${esc(V().name)} (${esc(V().fuel)})</h3>${['gpl','metano'].includes(V().fuel)?'<div class="note" style="color:var(--y)">Distributori '+(V().fuel==='gpl'?'GPL':'metano')+': i dati della mappa sono meno completi, verifica prima di partire.</div>':''}<div class="grid2">
     <div class="kpi"><span class="mut">Consumo previsto</span><b>${fp.need.toFixed(1)} litri</b><span class="mut">${fp.c.toFixed(1)} l/100 km ${fp.eff?'(dai tuoi pieni)':''}</span></div>
     <div class="kpi"><span class="mut">Costo stimato</span><b>€ ${fp.cost.toFixed(2)}</b><span class="mut">a ${(+SET.moto.price||0).toFixed(2)} €/${V().fuel==='metano'?'kg':'l'}</span></div>
     <div class="kpi"><span class="mut">Autonomia ora</span><b>${Math.round(fp.range)} km</b><span class="mut">pieno: ${Math.round(fp.full)} km</span></div>
     <div class="kpi"><span class="mut">Soste</span><b>${fp.req}</b><span class="mut">${fp.req?'+'+fp.req*10+' min circa':'non necessarie'} · arrivo con ${Math.round(fp.endRange)} km</span></div></div>
-    ${S.fuelState==='loading'?'<div class="mut" style="margin-top:8px">⏳ Cerco i distributori lungo il percorso…</div>':S.fuelState==='error'?'<div class="note" style="color:var(--r);margin-top:8px">⚠️ Distributori non caricati (server delle mappe occupato).</div><button id="fuelRetry" class="primary" style="margin-top:6px">↻ Riprova a caricare i distributori</button>':S.fuelState==='done'?`<div class="mut" style="margin-top:8px">✅ ${(r.fuelSt||[]).length} distributori sulla strada (entro 1,5 km) + ${(r.fuelFar||[]).length} nei dintorni (fino a 10 km) · tutti visibili sulla mappa</div>`:''}
+    ${S.fuelState==='loading'?'<div class="mut" style="margin-top:8px">⏳ Cerco i distributori lungo il percorso…</div>':S.fuelState==='error'?'<div class="note" style="color:var(--r);margin-top:8px">⚠️ Distributori non caricati (server delle mappe occupato).</div><button id="fuelRetry" class="primary" style="margin-top:6px">↻ Riprova a caricare i distributori</button>':S.fuelState==='done'?`<div class="mut" style="margin-top:8px">✅ ${(r.fuelSt||[]).length} distributori sulla strada (entro 1,5 km) + ${(r.fuelFar||[]).length} nei dintorni (fino a 10 km) · fonte: ${esc(S.fuelSrc||'')} · tutti visibili sulla mappa</div>`:''}
     ${fp.warn?`<div class="note" style="color:var(--y);margin-top:8px">⚠️ ${fp.warn}</div>`:''}
     <button data-fsearch="route" style="width:100%;margin-top:8px">🔍 Cerca altri distributori vicino al percorso</button>
     ${fp.stops.map(x=>stLine(x,'p')+(x.backup?stLine(x.backup,'b'):'<div class="mut" style="padding-left:34px">Nessun distributore di emergenza vicino</div>')).join('')}
-    <div class="note" style="margin-top:6px">🔴 Distributore designato per la sosta: scelto in sicurezza, anche prima del limite, solo se dopo di lui c’è un altro distributore raggiungibile restando sopra <b>${fp.M} km</b> di autonomia. Lo cerco sulla strada nei 20 km prima del punto ideale (anticipando la sosta, mai posticipandola); preferisco aree di servizio, aperti 24h/self e marchi principali. Solo se sulla strada non c’è nulla propongo un distributore fuori percorso (max 10 km) indicando la deviazione. 🔵 Riserva: il distributore successivo, sempre segnalato sul percorso. Distributori da OpenStreetMap: orari e servizio vanno sempre verificati.</div></div>`;
+    <div class="note" style="margin-top:6px">🔴 Distributore per la sosta: sulla strada, tra <b>${fp.MIN} e ${fp.MAX} km</b> dall’ultimo pieno (±${fp.TOL} km); preferisco aree di servizio, aperti 24h/self, marchi principali e vicinanza alla strada. Se in quella finestra non c’è nulla scelgo il più vicino utile, poi uno fuori percorso (max 10 km) con la deviazione indicata. 🔵 Riserva: il distributore successivo, sempre segnalato. 🔵 Riserva: il distributore successivo, sempre segnalato sul percorso. Distributori da OpenStreetMap: orari e servizio vanno sempre verificati.</div></div>`;
   h+=`<div class="card"><h3>Azioni</h3><button id="bNav" class="primary" style="margin:0 0 10px">▶︎ Naviga con GoRide</button><div class="links">
     <a href="${gmapsUrl(r)}" target="_blank" rel="noopener">🧭 Apri tutto il percorso in Google Maps</a></div>
     <div class="grid2"><button id="bGpx">⬇️ Esporta GPX</button><button id="bShare">🔗 Condividi</button></div>
@@ -1294,6 +1295,7 @@ if(!Array.isArray(SET.garage)||!SET.garage.length){
   SET.activeVeh='v1';
 }
 if(!Array.isArray(SET.contacts)){SET.contacts=[{n:SET.emName||'',p:SET.emPhone||''},{n:'',p:''},{n:'',p:''},{n:'',p:''}];}
+SET.garage.forEach(v=>{if(v.refMin==null){v.refMin=v.kind==='moto'&&v.auto<=400?150:Math.round(v.auto*0.43/10)*10;v.refMax=v.kind==='moto'&&v.auto<=400?200:Math.round(v.auto*0.58/10)*10;v.tol=20;if(!v.margin||v.margin>=100)v.margin=30;}});
 function V(){return SET.garage.find(v=>v.id===SET.activeVeh)||SET.garage[0];}
 Object.defineProperty(SET,'moto',{get:V,enumerable:false,configurable:true});
 const isMoto=()=>V().kind==='moto';
@@ -1311,7 +1313,7 @@ let vfEdit=null;
 function renderGarage(){
   const box=$('#garageList');if(!box)return;
   box.innerHTML=SET.garage.map(v=>`<div class="sv"><div class="n" data-act="${v.id}"><b>${v.id===V().id?'✅ ':''}${KIND_IC[v.kind]||''} ${esc(v.name)}</b>
-    <div class="mut">${esc(v.fuel)} · ${v.tank} ${v.fuel==='metano'?'kg':'l'} · ${v.auto} km · margine ${v.margin} km · ${(v.tank/v.auto*100).toFixed(1)} ${v.fuel==='metano'?'kg':'l'}/100 km</div></div>
+    <div class="mut">${esc(v.fuel)} · ${v.tank} ${v.fuel==='metano'?'kg':'l'} · ${v.auto} km · sosta tra ${v.refMin} e ${v.refMax} km (±${v.tol}) · ${(v.tank/v.auto*100).toFixed(1)} ${v.fuel==='metano'?'kg':'l'}/100 km</div></div>
     <button class="ib" data-ed="${v.id}">✏️</button></div>`).join('')+'<div class="mut" style="margin-top:4px">Tocca un veicolo per usarlo.</div>';
   box.querySelectorAll('[data-act]').forEach(e=>e.onclick=()=>{setActiveVeh(e.dataset.act);renderGarage();consInfo();toast('Veicolo attivo: '+V().name);});
   box.querySelectorAll('[data-ed]').forEach(e=>e.onclick=()=>openVehForm(SET.garage.find(v=>v.id===e.dataset.ed)));
@@ -1329,7 +1331,7 @@ function openVehForm(v){
   if(v){if([...$('#vfBrand').options].some(o=>o.value===v.brand))$('#vfBrand').value=v.brand;else $('#vfBrand').value='_other';vfModels();
     const ci=CATALOG.findIndex(c=>c[1]===v.brand&&c[2]===v.model);$('#vfModel').value=ci>=0?String(ci):'_other';}
   $('#vfName').value=v?v.name:'';$('#vfFuel').value=v?v.fuel:'benzina';$('#vfTank').value=v?v.tank:'';$('#vfAuto').value=v?v.auto:'';
-  $('#vfMargin').value=v?v.margin:100;$('#vfPrice').value=v?v.price:1.85;$('#vfName').scrollIntoView({block:'center'});
+  $('#vfMargin').value=v?v.margin:30;$('#vfRefMin').value=v?v.refMin:'';$('#vfRefMax').value=v?v.refMax:'';$('#vfTol').value=v?v.tol:20;$('#vfPrice').value=v?v.price:1.85;$('#vfName').scrollIntoView({block:'center'});
 }
 function initGarageForm(){
   $('#vehAdd').onclick=()=>openVehForm(null);
@@ -1337,11 +1339,12 @@ function initGarageForm(){
   $('#vfCancel').onclick=()=>{$('#vehForm').style.display='none';};
   $('#vfSave').onclick=()=>{
     const num=id=>parseFloat(String($('#'+id).value).replace(',','.'));
-    const tank=num('vfTank'),auto=num('vfAuto'),margin=num('vfMargin')||100,price=num('vfPrice')||0;
+    const tank=num('vfTank'),auto=num('vfAuto'),margin=num('vfMargin')||30,price=num('vfPrice')||0;let refMin=num('vfRefMin'),refMax=num('vfRefMax');const tol=num('vfTol')||20;
+    if(!(refMin>0))refMin=Math.round(auto*0.43/10)*10;if(!(refMax>refMin))refMax=Math.max(refMin+20,Math.round(auto*0.58/10)*10);
     if(!(tank>0&&auto>0)){toast('Inserisci serbatoio e autonomia');return;}
     const mi=$('#vfModel').value,c=mi!==''&&mi!=='_other'?CATALOG[+mi]:null;
     const name=$('#vfName').value.trim()||(c?c[1]+' '+c[2]:'Il mio veicolo');
-    const data={kind:$('#vfKind').value,brand:c?c[1]:($('#vfBrand').value&&$('#vfBrand').value!=='_other'?$('#vfBrand').value:''),model:c?c[2]:'',name,fuel:$('#vfFuel').value,tank,auto,margin,price};
+    const data={kind:$('#vfKind').value,brand:c?c[1]:($('#vfBrand').value&&$('#vfBrand').value!=='_other'?$('#vfBrand').value:''),model:c?c[2]:'',name,fuel:$('#vfFuel').value,tank,auto,margin,price,refMin,refMax,tol};
     if(vfEdit)Object.assign(vfEdit,data);else{const v={id:'v'+Date.now(),...data};SET.garage.push(v);SET.activeVeh=v.id;}
     saveSet();$('#vehForm').style.display='none';vehSelUI();renderGarage();$('#fuelNow').value=Math.round(V().auto);if(S.routes.length)renderAll(false);toast('Veicolo salvato');
   };
@@ -1667,7 +1670,7 @@ function navFuel(){
   const al=NAV.lastAlong||0;(r.fuelSt||[]).forEach(x=>{if(x.off>150)return;const pr=navProj(x.p,Math.max(0,NAV.lastI-5),NAV.coords.length);if(pr.d>200)return;const ah=pr.along-al;const k='fs'+Math.round(x.p[0]*1e4)+Math.round(x.p[1]*1e4);
     if(ah>=200&&ah<=Math.min(900,Math.max(450,RD.v*20))&&!NAV.said[k]){NAV.said[k]=1;speak(`Distributore ${x.name} tra ${mSay(ah)}.`);}});
   const ar=(RD.rangeStart??rangeNow())-RD.dist/1000;
-  if(ar<(SET.moto.margin||100)&&!NAV.said.lowfuel){NAV.said.lowfuel=1;speak(`Attenzione: autonomia stimata ${Math.round(ar)} chilometri, sotto il margine di sicurezza. Fai rifornimento al primo distributore.`);}
+  if(ar<Math.max(40,SET.moto.margin||30)&&!NAV.said.lowfuel){NAV.said.lowfuel=1;speak(`Attenzione: autonomia stimata ${Math.round(ar)} chilometri, sotto il margine di sicurezza. Fai rifornimento al primo distributore.`);}
 }
 function navSel(){if(!NAV.me)return;Object.entries(sels()).forEach(([k,v])=>{const d=hav(NAV.me,v.p);if(d<2500&&d>300&&!NAV.said['sel'+k]){NAV.said['sel'+k]=1;
   const cd=v.oh?closedDays(v.oh):'';showAlert(`📌 ${catOf(v.cat).ic} <b>${esc(v.name)}</b> a ${mSay(d)}${cd?' · chiuso '+cd:''}`,`Luogo selezionato vicino: ${v.name}, a ${mSay(d)}.`);}});}
@@ -1987,46 +1990,50 @@ const fullRange=()=>SET.moto.tank/effCons().c*100;
 function consInfo(){const e=effCons();const el=$('#consInfo');if(!el)return;
   el.innerHTML=(e.eff?`Consumo <b>effettivo</b> dai tuoi pieni (${e.n}): <b>${e.c.toFixed(1)} l/100 km</b> · autonomia reale ~${Math.round(fullRange())} km.`:
   `Consumo calcolato: ${SET.moto.tank} l ÷ ${SET.moto.auto} km = <b>${e.c.toFixed(1)} l/100 km</b> (${(100/e.c).toFixed(1)} km/l). Inserendo i litri dei pieni dopo le uscite, userò il consumo reale.`)+
-  ` Le soste sono pianificate perché l’autonomia non scenda mai sotto <b>${SET.moto.margin} km</b>.`;}
+  ` Soste pianificate tra <b>${SET.moto.refMin} e ${SET.moto.refMax} km</b> percorsi dall’ultimo pieno (±${SET.moto.tol} km), senza mai scendere sotto ${SET.moto.margin} km di autonomia.`;}
 function rangeNow(){const v=parseFloat(String(($('#fuelNow')||{}).value).replace(',','.'));return isFinite(v)&&v>=0?v:fullRange();}
 function fuelNowL(){return rangeNow()*effCons().c/100;}
 function pointAtKm(r,km){const d=km*1000;let j=r.cum.findIndex(x=>x>=d);if(j<0)j=r.coords.length-1;return r.coords[j];}
 function fuelPlan(r){
-  const e=effCons(),c=e.c,tot=r.len/1000,M=SET.moto.margin||100,full=fullRange();
-  const fu=V().fuel;const okF=x=>fu==='gpl'?x.lpg==='yes':fu==='metano'?x.cng==='yes':fu==='diesel'?x.diesel!=='no':x.o95!=='no';
-  const st=(r.fuelSt||[]).filter(okF);const stops=[];let pos=0,range=rangeNow(),guard=0,warn=null;
+  const e=effCons(),c=e.c,tot=r.len/1000,full=fullRange(),V0=V();
+  const MIN=V0.refMin||150,MAX=V0.refMax||200,TOL=V0.tol??20,RES=V0.margin||30,M=RES;
+  const fu=V0.fuel;const okF=x=>fu==='gpl'?(x.lpg==='yes'):fu==='metano'?(x.cng==='yes'):fu==='diesel'?x.diesel!=='no':x.o95!=='no';
+  const st=(r.fuelSt||[]).filter(okF),far=(r.fuelFar||[]).filter(okF);const stops=[];let warn=null,guard=0;
+  let pos=0,used=Math.max(0,full-rangeNow());
   const tAt=km=>S.dep+r.dur*1000*(km/tot)+stops.length*600000;
   const night=t=>{const h=new Date(t).getHours();return h>=20||h<7;};
   const BR=/eni|agip|q8|^ip\b|esso|tamoil|shell|total|api\b|erg/i;
-  const safety=x=>(x.h24?3:0)+(x.services?3:0)+(BR.test(x.name||'')?2:0)+(x.off<150?2:x.off<500?1:x.off>1000?-2:0);
-  while(pos+range-M<tot&&guard++<20){
-    const limit=pos+range-M;let prim=null;
-    if(limit<=pos+2){prim=st.find(x=>x.km>pos+0.5)||null;warn='Autonomia già vicina al margine: fai rifornimento al primo distributore.';}
-    else{
-      // un distributore è "sicuro" se dopo di lui c'è un distributore di riserva raggiungibile restando sopra il margine
-      const safe=st.filter(x=>x.km>pos+2&&x.km<=limit&&st.some(y=>y.km>x.km+2&&y.km<=limit));
-      const pool=safe.length?safe:st.filter(x=>x.km>pos+2&&x.km<=limit);
-      if(pool.length){const lastKm=pool[pool.length-1].km;const win=pool.filter(x=>x.km>=lastKm-(night(tAt(lastKm))?30:20));
-        prim=win.reduce((a,b)=>safety(b)>safety(a)||(safety(b)===safety(a)&&b.km>a.km)?b:a);
-        if(!safe.length)warn='Dopo una sosta non c’è un distributore di riserva entro il margine: valuta di fare il pieno prima.';}
-    }
-    if(!prim){const fr=(r.fuelFar||[]).filter(okF).filter(x=>x.km>pos+2&&x.km+2*x.off/1000<=limit);
-      if(fr.length){const lk=fr[fr.length-1].km;prim=fr.filter(x=>x.km>=lk-20).reduce((a,b)=>a.off<b.off?a:b);prim={...prim,detour:true};
+  const score=(x,core)=>(x.services?3:0)+(x.h24||(x.services)?2:0)+(BR.test(x.name||'')?1:0)+(x.off<150?2:x.off<600?1:0)+(core?3:0);
+  // serve una sosta se il resto del viaggio supera la finestra massima dall'ultimo pieno
+  while(tot-pos>MAX+TOL-used&&guard++<30){
+    const canGo=full-used-RES;                 // km percorribili restando sopra la riserva minima
+    const lo=pos+Math.max(2,MIN-TOL-used),hi=pos+Math.min(MAX+TOL-used,canGo);
+    const cMin=pos+Math.max(2,MIN-used),cMax=pos+Math.min(MAX-used,canGo);
+    let prim=null;
+    let cand=st.filter(x=>x.km>=lo&&x.km<=hi);
+    if(cand.length){const nt=night(tAt((lo+hi)/2));
+      prim=cand.reduce((a,b)=>{const sa=score(a,a.km>=cMin&&a.km<=cMax)+(nt&&a.h24?2:0),sb=score(b,b.km>=cMin&&b.km<=cMax)+(nt&&b.h24?2:0);return sb>sa||(sb===sa&&b.km>a.km)?b:a;});}
+    if(!prim){const ext=st.filter(x=>x.km>pos+2&&x.km<=pos+canGo);   // allargo: l'ultimo raggiungibile
+      if(ext.length){const inWin=ext.filter(x=>x.km<=hi);prim=(inWin.length?inWin:ext.filter(x=>x.km<=pos+canGo))[ (inWin.length?inWin:ext).length-1];
+        warn='Nella finestra '+MIN+'–'+MAX+' km non c’è un distributore sulla strada: ho scelto il più vicino utile.';}}
+    if(!prim){const fr=far.filter(x=>x.km>pos+2&&x.km+2*x.off/1000<=pos+canGo);
+      if(fr.length){prim={...fr.reduce((a,b)=>Math.abs(b.km-(lo+hi)/2)+b.off/1000<Math.abs(a.km-(lo+hi)/2)+a.off/1000?b:a),detour:true};
         warn='In un tratto non ci sono distributori sulla strada: ho scelto il più vicino fuori percorso (deviazione indicata).';}}
-    if(!prim||prim.km>pos+range){const km=Math.max(pos+1,Math.min(limit,tot));prim={km,p:pointAtKm(r,km),name:'Nessun distributore trovato',synthetic:true};
-      warn=S.fuelState==='done'?'In un tratto non ho trovato distributori sul percorso: fai il pieno prima o scegli una tappa in un centro abitato.':null;}
-    let bk=st.filter(x=>x.km>prim.km+2&&x.km<=pos+range-5)[0]||null;
+    if(!prim){const km=Math.min(tot,(lo+hi)/2);prim={km,p:pointAtKm(r,km),name:'Nessun distributore trovato',synthetic:true};
+      warn=S.fuelState==='done'?'Nessun distributore trovato in un tratto: usa “Cerca distributori qui”.':null;}
+    let bk=st.filter(x=>x.km>prim.km+2&&x.km<=pos+full-used-10)[0]||null;
     if(!bk){const bef=st.filter(x=>x.km<prim.km-2&&x.km>pos+2);bk=bef[bef.length-1]||null;}
-    const s={...prim,kind:'primary',n:stops.length+1,t:tAt(prim.km),rangeArr:range-(prim.km-pos)-(prim.detour?prim.off/1000:0)};
-    if(bk)s.backup={...bk,t:tAt(bk.km),rangeArr:range-(bk.km-pos)};
-    stops.push(s);pos=prim.km;range=full;
+    const rangeArr=full-used-(prim.km-pos)-(prim.detour?prim.off/1000:0);
+    const s0={...prim,kind:'primary',n:stops.length+1,t:tAt(prim.km),rangeArr};
+    if(bk)s0.backup={...bk,t:tAt(bk.km),rangeArr:full-used-(bk.km-pos)};
+    stops.push(s0);pos=prim.km+(prim.detour?0:0);used=prim.detour?prim.off/1000:0;
   }
-  // anche se non serve fermarsi, segnalo sempre un distributore designato (rosso) e uno di riserva (azzurro)
-  if(!stops.length&&st.length){const lim=Math.min(tot,pos+range-M);const pool=st.filter(x=>x.km<=lim);const p0=pool.length?pool.reduce((a,b)=>safety(b)>safety(a)||(safety(b)===safety(a)&&b.km>a.km)?b:a):st[0];
-    const bk=st.find(x=>x.km>p0.km+2)||st.slice().reverse().find(x=>x.km<p0.km-2)||null;
-    const s={...p0,kind:'primary',optional:true,n:1,t:tAt(p0.km),rangeArr:range-(p0.km-pos)};if(bk)s.backup={...bk,t:tAt(bk.km),rangeArr:range-(bk.km-pos)};stops.push(s);}
+  // nessuna sosta necessaria: segnalo comunque un distributore consigliato (rosso) e una riserva (azzurro)
+  if(!stops.length&&st.length){const lo=Math.max(2,MIN-TOL-used),hi=Math.min(tot,MAX+TOL-used);let pool=st.filter(x=>x.km>=lo&&x.km<=hi);if(!pool.length)pool=st.filter(x=>x.km<=tot);
+    if(pool.length){const p0=pool.reduce((a,b)=>score(b,true)>score(a,true)?b:a);const bk=st.find(x=>x.km>p0.km+2)||st.slice().reverse().find(x=>x.km<p0.km-2)||null;
+      const s0={...p0,kind:'primary',optional:true,n:1,t:tAt(p0.km),rangeArr:full-used-p0.km};if(bk)s0.backup={...bk,t:tAt(bk.km),rangeArr:full-used-bk.km};stops.push(s0);}}
   const need=tot*c/100;const req=stops.filter(x=>!x.optional).length;
-  return {c,eff:e.eff,need,cost:need*(SET.moto.price||0),stops,req,range:rangeNow(),full,M,warn,endRange:pos+range-tot};
+  return {c,eff:e.eff,need,cost:need*(SET.moto.price||0),stops,req,range:rangeNow(),full,M,MIN,MAX,TOL,warn,endRange:full-used-(tot-pos)};
 }
 /* distributori reali lungo il percorso (OpenStreetMap) */
 S.fuelState='idle';
@@ -2039,8 +2046,34 @@ function projKm(r,p){ // distanza dal percorso e km lungo il percorso
     const d=Math.hypot(ax+t*dx,ay+t*dy);if(d<best.d)best={d,i,t};}
   best.km=(r.cum[best.i]+(r.cum[best.i+1]-r.cum[best.i])*best.t)/1000;return best;
 }
+/* anagrafica ufficiale MIMIT (se presente nel sito dell'app), indicizzata a griglia */
+let FUELDB=null,FUELDB_TRY=0;
+async function loadFuelDB(){
+  if(FUELDB)return FUELDB;if(Date.now()-FUELDB_TRY<600000)return null;FUELDB_TRY=Date.now();
+  try{const r=await fetch('data/fuel_it.json',{cache:'no-cache'});if(!r.ok)return null;const j=await r.json();
+    const grid=new Map();j.s.forEach((x,i)=>{const k=Math.floor(x[0]*20)+','+Math.floor(x[1]*20);let a=grid.get(k);if(!a)grid.set(k,a=[]);a.push(i);});
+    FUELDB={...j,grid};return FUELDB;}catch(e){return null;}
+}
+function dbStation(db,x){const br=db.b[x[2]]||'';const white=/pompe bianche|indipendent/i.test(br);
+  const name=(white||!br?(x[3]||'Distributore'):br.replace(/^Agip Eni$/i,'Eni'))+(x[4]?' – area di servizio':'')+(x[9]?' · '+x[9]:'');
+  return {p:[x[0],x[1]],name,services:!!x[4],h24:!!x[4],oh:'',src:'mimit',pb:x[5],pd:x[6],pg:x[7],pm:x[8],
+    lpg:x[7]?'yes':'no',cng:x[8]?'yes':'no',diesel:x[6]?'yes':(x[5]||x[7]?'no':undefined),o95:x[5]?'yes':(x[6]?'no':undefined)};}
+function dbAlong(db,r){const seen=new Set(),out=[];
+  for(let i=0;i<r.coords.length;i+=Math.max(1,Math.round(r.coords.length/4000))){const p=r.coords[i];const a=Math.floor(p[0]*20),b=Math.floor(p[1]*20);
+    for(let da=-3;da<=3;da++)for(let db2=-4;db2<=4;db2++){const k=(a+da)+','+(b+db2);if(seen.has(k))continue;seen.add(k);(db.grid.get(k)||[]).forEach(ix=>out.push(dbStation(db,db.s[ix])));}}
+  return out;}
+const inItaly=p=>p[0]>35.3&&p[0]<47.2&&p[1]>6.5&&p[1]<18.7;
+const priceOf=x=>{const f=V().fuel;const v=f==='diesel'?x.pd:f==='gpl'?x.pg:f==='metano'?x.pm:x.pb;return v?(v/1000).toFixed(3).replace('.',',')+' €/'+(f==='metano'?'kg':'l'):'';};
 async function fetchFuel(){
   if(!S.routes.length)return;S.fuelState='loading';renderRoutes();
+  const db=await loadFuelDB();
+  if(db&&S.routes.every(r=>r.coords.every((p,i)=>i%50||inItaly(p)))){
+    S.routes.forEach(r=>{const out=[],far=[];dbAlong(db,r).forEach(s=>{const pr=projKm(r,s.p);const o={...s,km:pr.km,off:Math.round(pr.d)};
+      if(pr.d<=1500){if(!out.some(x=>hav(x.p,s.p)<60))out.push(o);}else if(pr.d<=10000)far.push(o);});
+      r.fuelSt=out.sort((a,b)=>a.km-b.km);r.fuelFar=far.sort((a,b)=>a.km-b.km);});
+    S.fuelState='done';S.fuelSrc='MIMIT '+db.v;renderAll(false);return;
+  }
+  S.fuelSrc='OpenStreetMap';
   try{
     const boxes=[];S.routes.forEach(r=>{const bx={};r.coords.forEach((p,i)=>{const k=Math.floor(r.cum[i]/15000);const b=bx[k]=bx[k]||[90,180,-90,-180];
         b[0]=Math.min(b[0],p[0]);b[1]=Math.min(b[1],p[1]);b[2]=Math.max(b[2],p[0]);b[3]=Math.max(b[3],p[1]);});
