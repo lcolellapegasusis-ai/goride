@@ -145,7 +145,7 @@ select{width:100%;background:#0f1218;color:var(--tx);border:1px solid var(--line
       <label><input type="checkbox" id="optToll"> Evita pedaggi</label>
       <label><input type="checkbox" id="optAuto"> Parti sempre dalla mia posizione</label>
     </div>
-    <label class="fld">⛽ Carburante a bordo ora (litri)<input type="number" id="fuelNow" min="0" max="60" step="0.5" inputmode="decimal"></label>
+    <label class="fld">⛽ Autonomia residua ora (km, come sul cruscotto)<input type="number" id="fuelNow" min="0" max="900" step="5" inputmode="numeric"></label>
     <label class="fld">Velocità media per tracce GPX (GPS Exchange Format), km/h<input type="number" id="gpxSpd" value="55" min="20" max="130"></label>
     <button id="go" class="primary">Calcola percorso e meteo</button>
   </section>
@@ -200,7 +200,7 @@ select{width:100%;background:#0f1218;color:var(--tx);border:1px solid var(--line
       <div class="kpi c"><span class="mut">Media</span><b id="avgVal">0</b></div>
       <div class="kpi c"><span class="mut">Max</span><b id="maxVal">0</b></div>
       <div class="kpi c"><span class="mut">Min</span><b id="minVal">–</b></div>
-      <div class="kpi c"><span class="mut">Benzina</span><b id="fuelVal">0.0</b><span class="mut">litri</span></div>
+      <div class="kpi c"><span class="mut">Autonomia</span><b id="fuelVal">–</b><span class="mut">km</span></div>
     </div>
     <div class="grid2" style="margin-top:8px">
       <div class="kpi c"><span class="mut">🌡️ Esterna</span><b id="tOut">–</b></div>
@@ -229,9 +229,9 @@ select{width:100%;background:#0f1218;color:var(--tx);border:1px solid var(--line
 <div id="view-set" class="view"><main>
   <div class="card"><h3>🏍️ La mia moto</h3>
     <label class="fld">Tipo di moto<select id="motoType"></select></label>
-    <label class="fld">Consumo medio dichiarato (litri/100 km)<input type="number" id="motoCons" step="0.1" min="1" max="15" inputmode="decimal"></label>
-    <label class="fld">Capacità serbatoio (litri)<input type="number" id="motoTank" step="0.5" min="3" max="40" inputmode="decimal"></label>
-    <label class="fld">Riserva da non usare (litri)<input type="number" id="motoRes" step="0.5" min="0" max="10" inputmode="decimal"></label>
+    <label class="fld">Capacità serbatoio (litri)<input type="number" id="motoTank" step="0.1" min="3" max="40" inputmode="decimal"></label>
+    <label class="fld">Autonomia con il pieno (km)<input type="number" id="motoAuto" step="5" min="50" max="900" inputmode="numeric"></label>
+    <label class="fld">Autonomia minima da conservare (km) – margine se un distributore è chiuso<input type="number" id="motoMargin" step="10" min="20" max="200" inputmode="numeric"></label>
     <label class="fld">Prezzo benzina (€/litro)<input type="number" id="motoPrice" step="0.01" min="0.5" max="4" inputmode="decimal"></label>
     <div class="note" id="consInfo"></div>
   </div>
@@ -576,7 +576,7 @@ async function calc(){
     status('Scarico le previsioni…');
     await loadWx(S.routes.flatMap(r=>r.samples.map(s=>s.key)));
     S.sel=0;S.dismissed={};renderAll(true);status('');window.scrollTo({top:0,behavior:'smooth'});
-    checkClosures();
+    checkClosures().then(fetchFuel);
     showTab('routes');
   }catch(e){console.error(e);status('');toast('Errore: '+(e.message||'rete non disponibile'));}
   finally{btn.disabled=false;status(S.routes.length?'':'');}
@@ -739,8 +739,9 @@ function drawMap(fit){
     const ic=L.divIcon({className:'',html:`<div class="wxi">${WMO(p.w.code,p.night)}</div>`,iconSize:[22,22],iconAnchor:[11,11]});
     L.marker(p.p,{icon:ic}).bindPopup(popup(p)).addTo(layer);
   });
-  try{fuelPlan(r).stops.forEach((s,i)=>L.marker(s.p,{icon:L.divIcon({className:'',html:'<div class="wxi">⛽</div>',iconSize:[22,22],iconAnchor:[11,11]})}).bindPopup(`<b>Sosta rifornimento ${i+1}</b><br>entro il km ${Math.round(s.km)} · ~${fmtT(s.t)}<br><a href="${gasUrl(s.p)}" target="_blank" rel="noopener">Trova distributori</a>`).addTo(layer));}catch(e){}
-  (r.closures||[]).forEach(cl=>L.marker(cl.p,{icon:L.divIcon({className:'',html:`<div class="wxi">${cl.active?'⛔':'🚧'}</div>`,iconSize:[22,22],iconAnchor:[11,11]})}).bindPopup(closureTxt(cl)).addTo(layer));
+  try{const mk=(x,col,title)=>L.marker(x.p,{icon:L.divIcon({className:'',html:`<div style="width:24px;height:24px;border-radius:50%;background:${col};border:2px solid #111;display:flex;align-items:center;justify-content:center;font-size:13px">⛽</div>`,iconSize:[24,24],iconAnchor:[12,12]})})
+      .bindPopup(`<b>${title}</b><br>${esc(x.synthetic?'Nessun distributore trovato':x.name)}<br>km ${Math.round(x.km)} · ~${fmtT(x.t)}<br>autonomia all’arrivo ${Math.round(x.rangeArr)} km<br><a href="${x.synthetic?gasUrl(x.p):navToUrl(x.p)}" target="_blank" rel="noopener">${x.synthetic?'Cerca distributori':'Portami qui'}</a>`).addTo(layer);
+    fuelPlan(r).stops.forEach(x=>{mk(x,'#3ecf6e','Sosta '+x.n);if(x.backup)mk(x.backup,'#5aa9ff','Emergenza sosta '+x.n);});}catch(e){console.warn(e);}
   const c=r.coords;
   L.circleMarker(c[0],{radius:7,color:'#fff',fillColor:'#3ecf6e',fillOpacity:1,weight:2}).addTo(layer);
   L.circleMarker(c[c.length-1],{radius:7,color:'#fff',fillColor:'#eb5757',fillOpacity:1,weight:2}).addTo(layer);
@@ -773,13 +774,20 @@ function renderRoutes(){
     h+=`<div class="card"><h3>🕒 Orario migliore per il meteo</h3><div class="grid2"><div class="kpi"><span class="mut">Consigliato</span><b>${fmtDT(b.dep)}</b><span style="color:${scCol(b.score)};font-weight:700">${b.score}/100</span></div><div class="kpi"><span class="mut">Orario scelto</span><b>${fmtDT(S.dep)}</b><span style="color:${scCol(cur)};font-weight:700">${cur??'–'}/100</span></div></div>
     ${Math.abs(b.dep-S.dep)>900000&&b.score>(cur||0)?`<button id="useBest" style="width:100%;margin-top:8px">Parti alle ${fmtT(b.dep)} (meteo migliore)</button>`:'<div class="mut" style="margin-top:6px">✅ L’orario scelto è già il migliore.</div>'}</div>`;}
   const fp=fuelPlan(r);
-  h+=`<div class="card"><h3>⛽ Carburante per questo percorso</h3><div class="grid2">
-    <div class="kpi"><span class="mut">Consumo previsto</span><b>${fp.need.toFixed(1)} litri</b><span class="mut">${fp.c.toFixed(1)} l/100 km ${fp.eff?'(effettivo)':'(dichiarato)'}</span></div>
-    <div class="kpi"><span class="mut">Costo stimato</span><b>€ ${fp.cost.toFixed(2)}</b><span class="mut">a ${(SET.moto.price||0).toFixed(2)} €/l</span></div>
-    <div class="kpi"><span class="mut">Autonomia ora</span><b>${Math.round(fp.range)} km</b><span class="mut">con ${fuelNowL()} l, riserva esclusa</span></div>
-    <div class="kpi"><span class="mut">Soste rifornimento</span><b>${fp.stops.length}</b><span class="mut">${fp.stops.length?'+'+fp.stops.length*10+' min circa':'non servono'}</span></div></div>
-    ${fp.stops.length?'<ul class="al" style="margin-top:6px">'+fp.stops.map((s,i)=>`<li>⛽ <b>Sosta ${i+1}</b> entro il km ${Math.round(s.km)} (circa ${fmtT(s.t)}) · <a href="${gasUrl(s.p)}" target="_blank" rel="noopener" style="color:var(--acc)">trova distributori</a></li>`).join('')+'</ul>':''}
-    <div class="note" style="margin-top:6px">Moto: ${esc(MOTO_TYPES[SET.moto.type]?MOTO_TYPES[SET.moto.type][0]:'')} · serbatoio ${SET.moto.tank} l · riserva ${SET.moto.reserve} l. Soste calcolate con 10% di margine. Modifica i dati in ⚙️ Impostazioni.</div></div>`;
+  const stLine=(x,kind)=>`<div style="display:flex;gap:8px;align-items:flex-start;padding:8px 0;${kind==='p'?'border-top:1px solid var(--line)':''}">
+     <div style="width:26px;height:26px;border-radius:50%;background:${kind==='p'?'#3ecf6e':'#5aa9ff'};display:flex;align-items:center;justify-content:center;flex:none;font-size:14px">⛽</div>
+     <div style="flex:1"><b>${kind==='p'?'Sosta '+x.n:'Emergenza'}${x.synthetic?'':': '+esc(x.name)}</b>${x.synthetic?' <span style="color:var(--r)">– nessun distributore trovato qui</span>':''}
+     <div class="mut">km ${Math.round(x.km)} · ~${fmtT(x.t)} · autonomia all’arrivo <b style="color:${kind==='p'&&x.rangeArr<fp.M?'var(--r)':'inherit'}">${Math.round(x.rangeArr)} km</b>${x.off>100?' · '+x.off+' m dal percorso':''}${x.h24?' · 24h/self':x.oh?' · orari: '+esc(x.oh):''}</div>
+     <a href="${x.synthetic?gasUrl(x.p):navToUrl(x.p)}" target="_blank" rel="noopener" style="color:var(--acc);font-size:13px">${x.synthetic?'cerca distributori in zona':'portami qui'}</a></div></div>`;
+  h+=`<div class="card"><h3>⛽ Carburante e soste</h3><div class="grid2">
+    <div class="kpi"><span class="mut">Consumo previsto</span><b>${fp.need.toFixed(1)} litri</b><span class="mut">${fp.c.toFixed(1)} l/100 km ${fp.eff?'(dai tuoi pieni)':''}</span></div>
+    <div class="kpi"><span class="mut">Costo stimato</span><b>€ ${fp.cost.toFixed(2)}</b><span class="mut">a ${(+SET.moto.price||0).toFixed(2)} €/l</span></div>
+    <div class="kpi"><span class="mut">Autonomia ora</span><b>${Math.round(fp.range)} km</b><span class="mut">pieno: ${Math.round(fp.full)} km</span></div>
+    <div class="kpi"><span class="mut">Soste</span><b>${fp.stops.length}</b><span class="mut">${fp.stops.length?'+'+fp.stops.length*10+' min circa':'non servono'} · arrivo con ${Math.round(fp.endRange)} km</span></div></div>
+    ${S.fuelState==='loading'?'<div class="mut" style="margin-top:8px">⏳ Cerco i distributori lungo il percorso…</div>':''}
+    ${fp.warn?`<div class="note" style="color:var(--y);margin-top:8px">⚠️ ${fp.warn}</div>`:''}
+    ${fp.stops.map(x=>stLine(x,'p')+(x.backup?stLine(x.backup,'b'):'<div class="mut" style="padding-left:34px">Nessun distributore di emergenza vicino</div>')).join('')}
+    <div class="note" style="margin-top:6px">🟢 Sosta principale: l’ultimo distributore sul percorso prima che l’autonomia scenda sotto <b>${fp.M} km</b>. 🔵 Emergenza: il distributore successivo (o precedente) da usare se quello principale è chiuso. Di notte preferisco distributori 24h/self quando ci sono. Distributori da OpenStreetMap: orari e servizio vanno sempre verificati.</div></div>`;
   h+=`<div class="card"><h3>Azioni</h3><button id="bNav" class="primary" style="margin:0 0 10px">▶︎ Naviga con GoRide</button><div class="links">
     <a href="${gmapsUrl(r)}" target="_blank" rel="noopener">🧭 Apri tutto il percorso in Google Maps</a></div>
     <div class="grid2"><button id="bGpx">⬇️ Esporta GPX</button><button id="bShare">🔗 Condividi</button></div>
@@ -1059,15 +1067,26 @@ function showTab(t){document.querySelectorAll('.tabs button').forEach(b=>b.class
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{showTab(b.dataset.tab);if(b.dataset.tab==='saved')renderSaved();});
 
 /* ================= impostazioni ================= */
-const MOTO_TYPES=[['Scooter 125–300',2.8,9,1.5],['Scooter maxi 400–750',4.2,14,2],['Naked media 600–900',5.0,15,3],['Naked/Sport 1000+',6.5,17,3.5],['Sportiva carenata',6.8,17,3.5],['Crossover / Sport-touring',5.5,19,3.5],['Adventure / Enduro stradale',5.3,20,4],['Custom / Cruiser (es. Harley-Davidson)',6.0,18,3.5],['Touring grande (es. Electra Glide, Gold Wing)',6.5,22,4],['Personalizzata',5.0,15,3]];
-const SET=Object.assign({crash:true,voice:false,traffic:true,emName:'',emPhone:'',moto:{type:7,cons:6.0,tank:18,reserve:3.5,price:1.85}},LS.get('motorotta_set',{}));
+const MOTO_TYPES=[
+  {k:'hd_sg',n:'Harley-Davidson Street Glide',tank:22.7,auto:345},
+  {k:'hd_touring',n:'Harley-Davidson Touring (Road Glide, Road King, Electra)',tank:22.7,auto:340},
+  {k:'hd_softail',n:'Harley-Davidson Softail / Cruiser',tank:18.9,auto:300},
+  {k:'touring',n:'Touring grande (Gold Wing, K 1600…)',tank:21.1,auto:370},
+  {k:'adv',n:'Adventure / Enduro stradale',tank:20,auto:380},
+  {k:'sporttour',n:'Crossover / Sport-touring',tank:19,auto:340},
+  {k:'naked',n:'Naked media 600–900',tank:15,auto:300},
+  {k:'sport',n:'Sportiva carenata',tank:17,auto:250},
+  {k:'scooter',n:'Scooter maxi 400–750',tank:14,auto:330},
+  {k:'custom',n:'Personalizzata',tank:15,auto:300}];
+const SET=Object.assign({crash:true,voice:false,traffic:true,emName:'',emPhone:'',moto:{type:'hd_sg',tank:22.7,auto:345,margin:100,price:1.85}},LS.get('motorotta_set',{}));
+if(!SET.moto||SET.moto.auto==null){SET.moto={type:'hd_sg',tank:22.7,auto:345,margin:100,price:(SET.moto&&SET.moto.price)||1.85};LS.set('motorotta_set',SET);}
 const saveSet=()=>LS.set('motorotta_set',SET);
 function initSettings(){
-  const ms=$('#motoType');ms.innerHTML=MOTO_TYPES.map((m,i)=>`<option value="${i}">${m[0]} – ~${m[1]} l/100 km</option>`).join('');
-  ms.value=SET.moto.type;$('#motoCons').value=SET.moto.cons;$('#motoTank').value=SET.moto.tank;$('#motoRes').value=SET.moto.reserve;$('#motoPrice').value=SET.moto.price;
-  ms.onchange=()=>{const m=MOTO_TYPES[+ms.value];SET.moto.type=+ms.value;SET.moto.cons=m[1];SET.moto.tank=m[2];SET.moto.reserve=m[3];
-    $('#motoCons').value=m[1];$('#motoTank').value=m[2];$('#motoRes').value=m[3];saveSet();consInfo();};
-  [['motoCons','cons'],['motoTank','tank'],['motoRes','reserve'],['motoPrice','price']].forEach(([id,k])=>$('#'+id).oninput=e=>{const v=parseFloat(String(e.target.value).replace(',','.'));if(isFinite(v)){SET.moto[k]=v;saveSet();consInfo();}});
+  const ms=$('#motoType');ms.innerHTML=MOTO_TYPES.map(m=>`<option value="${m.k}">${m.n}</option>`).join('');
+  ms.value=SET.moto.type;$('#motoTank').value=SET.moto.tank;$('#motoAuto').value=SET.moto.auto;$('#motoMargin').value=SET.moto.margin;$('#motoPrice').value=SET.moto.price;
+  ms.onchange=()=>{const m=MOTO_TYPES.find(x=>x.k===ms.value);SET.moto.type=m.k;SET.moto.tank=m.tank;SET.moto.auto=m.auto;
+    $('#motoTank').value=m.tank;$('#motoAuto').value=m.auto;saveSet();consInfo();};
+  [['motoTank','tank'],['motoAuto','auto'],['motoMargin','margin'],['motoPrice','price']].forEach(([id,k])=>$('#'+id).oninput=e=>{const v=parseFloat(String(e.target.value).replace(',','.'));if(isFinite(v)&&v>0){SET.moto[k]=v;saveSet();consInfo();}});
   consInfo();
   $('#setCrash').checked=SET.crash;$('#setVoice').checked=SET.voice;$('#trafOn').checked=SET.traffic;
   $('#emName').value=SET.emName;$('#emPhone').value=SET.emPhone;
@@ -1186,7 +1205,7 @@ let uiTimer=null;
 function rideUI(){
   updateTemp(false);tempUI();
   if(RD.on){$('#avgVal').textContent=RD.mov>5?Math.round(RD.dist/RD.mov*3.6):0;$('#maxVal').textContent=Math.round((RD.vmax||0)*3.6);
-    $('#minVal').textContent=isFinite(RD.vmin)?Math.round(RD.vmin*3.6):'–';$('#fuelVal').textContent=(RD.dist/1000*effCons().c/100).toFixed(1);}
+    $('#minVal').textContent=isFinite(RD.vmin)?Math.round(RD.vmin*3.6):'–';{const ar=Math.round((RD.rangeStart??rangeNow())-RD.dist/1000);$('#fuelVal').textContent=ar;$('#fuelVal').style.color=ar<(SET.moto.margin||100)?'var(--r)':'';}}
   const l=RD.lean;$('#needle').setAttribute('transform',`rotate(${Math.max(-62,Math.min(62,l))} 150 150)`);
   $('#leanVal').textContent=Math.abs(Math.round(l))+'°';
   $('#leanDir').textContent=Math.abs(l)<2?'dritto':l<0?'◀ sinistra':'destra ▶';
@@ -1202,7 +1221,7 @@ async function startRide(fromNav){
   unlockAudio();RD.navSummary=null;
   try{if(typeof DeviceMotionEvent!=='undefined'&&DeviceMotionEvent.requestPermission){const st=await DeviceMotionEvent.requestPermission();if(st!=='granted')toast('Sensori di movimento negati: userò solo il GPS');}}catch(e){}
   if(!navigator.geolocation){toast('GPS non disponibile');return;}
-  Object.assign(RD,{on:true,temps:[],mov:0,vmax:0,vmin:Infinity,fixes:[],lean:0,maxSince:0,maxL:0,maxR:0,dist:0,t0:Date.now(),lastFix:null,crashT:0,lastSave:Date.now(),vote:0,k:1,gyro:null});
+  Object.assign(RD,{on:true,rangeStart:rangeNow(),temps:[],mov:0,vmax:0,vmin:Infinity,fixes:[],lean:0,maxSince:0,maxL:0,maxR:0,dist:0,t0:Date.now(),lastFix:null,crashT:0,lastSave:Date.now(),vote:0,k:1,gyro:null});
   window.addEventListener('devicemotion',onMotion);
   RD.watch=navigator.geolocation.watchPosition(onPos,err=>{if(err.code===1)toast('GPS: permesso negato');},{enableHighAccuracy:true,maximumAge:0,timeout:20000});
   await requestWake();
@@ -1332,7 +1351,15 @@ async function navRecalc(pos,toStop){ // ricalcolo dalla posizione attuale verso
     navDraw();navStatus('✅ Nuovo percorso verso '+esc(n.name),'#16351f');speak('Percorso ricalcolato verso '+n.name+'.');
   }catch(e){NAV.recalcPending=true;navStatus('📵 Rete assente: segui la linea arancione, ricalcolo appena torna il segnale','#4a3a12');}
 }
-function navAlerts(along){ // avvisi meteo e chiusure in arrivo (3–6 km)
+function navFuel(){
+  if(!NAV.me)return;const r=S.routes[S.sel];if(!r)return;let fp;try{fp=fuelPlan(r);}catch(e){return;}
+  fp.stops.forEach(x=>{if(x.synthetic)return;const d=hav(NAV.me,x.p);
+    [[5000,'5'],[1000,'1']].forEach(([lim,lab])=>{const k='f'+x.n+lab;if(d<lim&&d>(lim===5000?1500:150)&&!NAV.said[k]){NAV.said[k]=1;
+      speak(`Tra circa ${lab==='1'?'un chilometro':'5 chilometri'} sosta rifornimento: ${x.name}.`+(x.backup&&lab==='5'?` Se è chiuso, emergenza: ${x.backup.name} al chilometro ${Math.round(x.backup.km)}.`:''));}});});
+  const ar=(RD.rangeStart??rangeNow())-RD.dist/1000;
+  if(ar<(SET.moto.margin||100)&&!NAV.said.lowfuel){NAV.said.lowfuel=1;speak(`Attenzione: autonomia stimata ${Math.round(ar)} chilometri, sotto il margine di sicurezza. Fai rifornimento al primo distributore.`);}
+}
+function navAlerts(along){navFuel(); // avvisi meteo e chiusure in arrivo (3–6 km)
   const r=S.routes[S.sel],ev=S.ev[S.sel];if(!ev)return;
   ev.pts.forEach(p=>{if(!p.w)return;const ahead=p.d-along;if(ahead<2500||ahead>6000)return;
     const k=Math.round(p.d/1000);let t=null;
@@ -1379,27 +1406,75 @@ $('#askBack').onclick=()=>{navAskClose();NAV.quietUntil=Date.now()+60000;const n
 window.addEventListener('online',()=>{if(NAV.active&&NAV.recalcPending&&NAV.me){NAV.lastRecalc=0;navRecalc(NAV.me);}});
 
 /* ================= carburante ================= */
-function effCons(){ // consumo effettivo medio dai pieni registrati, altrimenti quello dichiarato
+function effCons(){ // consumo: dai pieni registrati se disponibili, altrimenti serbatoio ÷ autonomia
   const r=LS.get('motorotta_rides',[]).filter(x=>x.fuelL>0&&x.dist>5000);
   const km=r.reduce((a,x)=>a+x.dist/1000,0),l=r.reduce((a,x)=>a+x.fuelL,0);
-  return km>=20?{c:l/km*100,n:r.length,eff:true}:{c:SET.moto.cons,n:0,eff:false};
+  return km>=20?{c:l/km*100,n:r.length,eff:true}:{c:SET.moto.tank/SET.moto.auto*100,n:0,eff:false};
 }
+const fullRange=()=>SET.moto.tank/effCons().c*100;
 function consInfo(){const e=effCons();const el=$('#consInfo');if(!el)return;
-  el.innerHTML=e.eff?`Consumo <b>effettivo</b> medio: <b>${e.c.toFixed(1)} l/100 km</b> (${(100/e.c).toFixed(1)} km/l) da ${e.n} pieni registrati. È questo che uso per le previsioni.`:
-  `Uso il consumo dichiarato (${SET.moto.cons} l/100 km). Dopo un’uscita, inserisci i litri del pieno nel dettaglio dell’uscita: calcolerò il tuo consumo effettivo.`;}
-function fuelNowL(){const v=parseFloat(String($('#fuelNow').value).replace(',','.'));return isFinite(v)&&v>=0?v:SET.moto.tank;}
+  el.innerHTML=(e.eff?`Consumo <b>effettivo</b> dai tuoi pieni (${e.n}): <b>${e.c.toFixed(1)} l/100 km</b> · autonomia reale ~${Math.round(fullRange())} km.`:
+  `Consumo calcolato: ${SET.moto.tank} l ÷ ${SET.moto.auto} km = <b>${e.c.toFixed(1)} l/100 km</b> (${(100/e.c).toFixed(1)} km/l). Inserendo i litri dei pieni dopo le uscite, userò il consumo reale.`)+
+  ` Le soste sono pianificate perché l’autonomia non scenda mai sotto <b>${SET.moto.margin} km</b>.`;}
+function rangeNow(){const v=parseFloat(String(($('#fuelNow')||{}).value).replace(',','.'));return isFinite(v)&&v>=0?v:fullRange();}
+function fuelNowL(){return rangeNow()*effCons().c/100;}
+function pointAtKm(r,km){const d=km*1000;let j=r.cum.findIndex(x=>x>=d);if(j<0)j=r.coords.length-1;return r.coords[j];}
 function fuelPlan(r){
-  const e=effCons(),c=e.c,tank=SET.moto.tank,res=SET.moto.reserve,tot=r.len/1000;
-  const need=tot*c/100;const stops=[];const margin=0.9;
-  let reach=Math.max(0,(fuelNowL()-res))/c*100*margin;const full=Math.max(1,(tank-res))/c*100*margin;
-  let guard=0;
-  while(reach<tot&&guard++<30){
-    const d=Math.max(1,reach)*1000;let j=r.cum.findIndex(x=>x>=d);if(j<0)j=r.coords.length-1;
-    stops.push({km:d/1000,p:r.coords[j],t:S.dep+r.dur*1000*(d/r.len)+stops.length*600000});
-    reach=d/1000+full;
+  const e=effCons(),c=e.c,tot=r.len/1000,M=SET.moto.margin||100,full=fullRange();
+  const st=r.fuelSt||[];const stops=[];let pos=0,range=rangeNow(),guard=0,warn=null;
+  const tAt=km=>S.dep+r.dur*1000*(km/tot)+stops.length*600000;
+  const night=t=>{const h=new Date(t).getHours();return h>=20||h<7;};
+  while(pos+range-M<tot&&guard++<20){
+    let limit=pos+range-M;
+    let cands=st.filter(x=>x.km>pos+2&&x.km<=limit);
+    let prim=null;
+    if(limit<=pos+2){prim=st.find(x=>x.km>pos+0.5)||null;warn='Autonomia già vicina al margine: fai rifornimento al primo distributore.';}
+    else if(cands.length){
+      prim=cands[cands.length-1];
+      if(night(tAt(prim.km))){const h24=cands.filter(x=>x.h24&&x.km>=limit-40);if(h24.length)prim=h24[h24.length-1];}
+    }
+    if(!prim||prim.km>pos+range){const km=Math.max(pos+1,Math.min(limit,tot));prim={km,p:pointAtKm(r,km),name:'Nessun distributore trovato',synthetic:true};
+      warn=S.fuelState==='done'?'In un tratto non ho trovato distributori sul percorso: fai il pieno prima o scegli una tappa in un centro abitato.':null;}
+    const reach=pos+range-5;
+    let bk=st.filter(x=>x.km>prim.km+3&&x.km<=reach)[0]||null;
+    if(!bk){const bef=st.filter(x=>x.km<prim.km-3&&x.km>pos+2);bk=bef[bef.length-1]||null;}
+    const s={...prim,kind:'primary',n:stops.length+1,t:tAt(prim.km),rangeArr:range-(prim.km-pos)};
+    if(bk)s.backup={...bk,t:tAt(bk.km),rangeArr:range-(bk.km-pos)};
+    stops.push(s);pos=prim.km;range=full;
   }
-  return {c,eff:e.eff,need,cost:need*(SET.moto.price||0),stops,range:Math.max(0,(fuelNowL()-res))/c*100,fullRange:(tank-res)/c*100};
+  const need=tot*c/100;
+  return {c,eff:e.eff,need,cost:need*(SET.moto.price||0),stops,range:rangeNow(),full,M,warn,endRange:pos+range-tot};
 }
+/* distributori reali lungo il percorso (OpenStreetMap) */
+S.fuelState='idle';
+function projKm(r,p){ // distanza dal percorso e km lungo il percorso
+  const c=r.coords,k=Math.cos(p[0]*rad)*111320;let best={d:Infinity,i:0,t:0};
+  for(let i=0;i<c.length-1;i++){
+    const ax=(c[i][1]-p[1])*k,ay=(c[i][0]-p[0])*111320,bx=(c[i+1][1]-p[1])*k,by=(c[i+1][0]-p[0])*111320;
+    if(Math.min(Math.abs(ax),Math.abs(bx))>3000&&Math.sign(ax)===Math.sign(bx))continue;
+    const dx=bx-ax,dy=by-ay,L2=dx*dx+dy*dy;let t=L2?-(ax*dx+ay*dy)/L2:0;t=Math.max(0,Math.min(1,t));
+    const d=Math.hypot(ax+t*dx,ay+t*dy);if(d<best.d)best={d,i,t};}
+  best.km=(r.cum[best.i]+(r.cum[best.i+1]-r.cum[best.i])*best.t)/1000;return best;
+}
+async function fetchFuel(){
+  if(!S.routes.length)return;S.fuelState='loading';renderRoutes();
+  try{
+    const lines=S.routes.map(r=>{const n=Math.min(300,Math.max(20,Math.round(r.len/500)));const pts=[];
+      for(let k=0;k<=n;k++){pts.push(pointAtKm(r,r.len/1000*k/n));}return pts.map(p=>p[0].toFixed(5)+','+p[1].toFixed(5)).join(',');});
+    const q='[out:json][timeout:30];(\n'+lines.map(a=>`nwr(around:400,${a})["amenity"="fuel"];`).join('\n')+'\n);out tags center 600;';
+    const res=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:'data='+encodeURIComponent(q),headers:{'Content-Type':'application/x-www-form-urlencoded'}});
+    const j=await res.json();
+    const all=(j.elements||[]).map(e=>{const t=e.tags||{};const lat=e.lat??(e.center&&e.center.lat),lon=e.lon??(e.center&&e.center.lon);if(lat==null)return null;
+      const oh=t.opening_hours||'';const h24=oh==='24/7'||t.self_service==='yes'||t.automated==='yes';
+      return {p:[lat,lon],name:t.brand||t.name||t.operator||'Distributore',addr:[t['addr:street'],t['addr:city']].filter(Boolean).join(', '),oh,h24};}).filter(Boolean);
+    S.routes.forEach(r=>{
+      const out=[];all.forEach(s=>{const pr=projKm(r,s.p);if(pr.d<=450&&!out.some(o=>hav(o.p,s.p)<150))out.push({...s,km:pr.km,off:Math.round(pr.d)});});
+      r.fuelSt=out.sort((a,b)=>a.km-b.km);});
+    S.fuelState='done';
+  }catch(e){console.warn(e);S.fuelState='error';toast('Distributori non disponibili ora: soste indicative');}
+  renderAll(false);
+}
+const navToUrl=p=>`https://www.google.com/maps/dir/?api=1&destination=${p[0].toFixed(5)},${p[1].toFixed(5)}&travelmode=driving`;
 const gasUrl=p=>`https://www.google.com/maps/search/distributore+benzina/@${p[0].toFixed(5)},${p[1].toFixed(5)},14z`;
 
 /* ================= temperatura durante la guida ================= */
@@ -1628,7 +1703,7 @@ function renderTraffic(){
 /* ================= avvio ================= */
 renderStops();renderSaved();initSettings();
 $('#routeMode').value=LS.get('motorotta_mode','curvy');
-$('#fuelNow').value=SET.moto.tank;$('#fuelNow').addEventListener('change',()=>{if(S.routes.length)renderAll(false);});
+$('#fuelNow').value=Math.round(SET.moto.auto);$('#fuelNow').addEventListener('change',()=>{if(S.routes.length)renderAll(false);});
 try{$('#optAuto').checked=LS.get('motorotta_autopos',false);$('#optAuto').onchange=e=>{LS.set('motorotta_autopos',e.target.checked);if(e.target.checked&&!S.stops[0].p)geoLocate(0);};}catch(e){}
 autoStart();
 if(location.hash.startsWith('#r')){try{applyPayload(b64d(location.hash.slice(2)));calc();}catch(e){console.warn(e);}}
