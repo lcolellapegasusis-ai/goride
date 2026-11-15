@@ -2056,6 +2056,7 @@ async function loadFuelDB(){
 }
 function dbStation(db,x){const br=db.b[x[2]]||'';const white=/pompe bianche|indipendent/i.test(br);
   const name=(white||!br?(x[3]||'Distributore'):br.replace(/^Agip Eni$/i,'Eni'))+(x[4]?' – area di servizio':'')+(x[9]?' · '+x[9]:'');
+  const fl=x[10];if(fl!=null)return {p:[x[0],x[1]],name,services:!!x[4],h24:!!x[4]||fl.includes('H'),oh:'',src:'osm',lpg:fl.includes('L')?'yes':undefined,cng:fl.includes('M')?'yes':undefined,diesel:fl.includes('X')?'no':undefined};
   return {p:[x[0],x[1]],name,services:!!x[4],h24:!!x[4],oh:'',src:'mimit',pb:x[5],pd:x[6],pg:x[7],pm:x[8],
     lpg:x[7]?'yes':'no',cng:x[8]?'yes':'no',diesel:x[6]?'yes':(x[5]||x[7]?'no':undefined),o95:x[5]?'yes':(x[6]?'no':undefined)};}
 function dbAlong(db,r){const seen=new Set(),out=[];
@@ -2071,7 +2072,7 @@ async function fetchFuel(){
     S.routes.forEach(r=>{const out=[],far=[];dbAlong(db,r).forEach(s=>{const pr=projKm(r,s.p);const o={...s,km:pr.km,off:Math.round(pr.d)};
       if(pr.d<=1500){if(!out.some(x=>hav(x.p,s.p)<60))out.push(o);}else if(pr.d<=10000)far.push(o);});
       r.fuelSt=out.sort((a,b)=>a.km-b.km);r.fuelFar=far.sort((a,b)=>a.km-b.km);});
-    S.fuelState='done';S.fuelSrc='MIMIT '+db.v;renderAll(false);return;
+    S.fuelState='done';S.fuelSrc=(db.src||'MIMIT')+' '+db.v;renderAll(false);return;
   }
   S.fuelSrc='OpenStreetMap';
   try{

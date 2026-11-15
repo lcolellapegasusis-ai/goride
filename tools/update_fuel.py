@@ -10,7 +10,7 @@ def get(name):
     for b in BASES:
         try:
             req = urllib.request.Request(b + name, headers={'User-Agent': 'Mozilla/5.0 (GoRide fuel updater)'})
-            data = urllib.request.urlopen(req, timeout=180).read()
+            data = urllib.request.urlopen(req, timeout=60).read()
             for enc in ('utf-8', 'latin-1'):
                 try:
                     return data.decode(enc)
@@ -36,8 +36,52 @@ def num(x):
     except Exception:
         return None
 
-ana = get('anagrafica_impianti_attivi.csv')
-pre = get('prezzo_alle_8.csv')
+OVP = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter',
+       'https://maps.mail.ru/osm/tools/overpass/api/interpreter', 'https://overpass.private.coffee/api/interpreter']
+
+def osm_fallback():
+    q = ('[out:json][timeout:600];area["ISO3166-1"="IT"][admin_level=2]->.it;area["ISO3166-1"="SM"][admin_level=2]->.sm;'
+         '(nwr["amenity"="fuel"](area.it);nwr["amenity"="fuel"](area.sm););out tags center;')
+    data = None
+    for u in OVP:
+        try:
+            req = urllib.request.Request(u, data=urllib.parse.urlencode({'data': q}).encode(), headers={'User-Agent': 'GoRide fuel updater'})
+            data = json.loads(urllib.request.urlopen(req, timeout=700).read())
+            if len(data.get('elements', [])) > 5000:
+                break
+        except Exception as e:  # noqa
+            print('overpass fallito', u, e, file=sys.stderr)
+    if not data or len(data.get('elements', [])) < 5000:
+        raise SystemExit('Anche OpenStreetMap non disponibile')
+    brands, bidx, out = [], {}, []
+    for el in data['elements']:
+        t = el.get('tags', {})
+        lat = el.get('lat') or el.get('center', {}).get('lat'); lon = el.get('lon') or el.get('center', {}).get('lon')
+        if lat is None:
+            continue
+        band = t.get('brand') or t.get('operator') or ''
+        if band not in bidx:
+            bidx[band] = len(brands); brands.append(band)
+        name = t.get('name') or band or 'Distributore'
+        serv = 1 if ('servizio' in name.lower() or t.get('highway') == 'services') else 0
+        fl = ('L' if t.get('fuel:lpg') == 'yes' else '') + ('M' if t.get('fuel:cng') == 'yes' else '') + \
+             ('H' if t.get('opening_hours') == '24/7' or t.get('self_service') == 'yes' or t.get('automated') == 'yes' else '') + \
+             ('X' if t.get('fuel:diesel') == 'no' else '')
+        out.append([round(lat, 5), round(lon, 5), bidx[band], name[:40], serv, 0, 0, 0, 0, (t.get('addr:city') or '')[:30], fl])
+    return brands, out
+
+import urllib.parse
+try:
+    ana = get('anagrafica_impianti_attivi.csv')
+    pre = get('prezzo_alle_8.csv')
+except SystemExit as e:
+    print('MIMIT non raggiungibile, uso OpenStreetMap:', e, file=sys.stderr)
+    brands, out = osm_fallback()
+    os.makedirs('data', exist_ok=True)
+    json.dump({'v': datetime.date.today().isoformat(), 'src': 'OpenStreetMap', 'b': brands, 's': out},
+              open('data/fuel_it.json', 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
+    print('impianti (OSM):', len(out))
+    raise SystemExit(0)
 
 prices = {}
 for p in split_rows(pre, 'idImpianto'):
@@ -76,5 +120,5 @@ for r in split_rows(ana, 'idImpianto'):
 if len(out) < 5000:
     raise SystemExit(f'Troppi pochi impianti ({len(out)}): non aggiorno il file')
 os.makedirs('data', exist_ok=True)
-json.dump({'v': datetime.date.today().isoformat(), 'b': brands, 's': out}, open('data/fuel_it.json', 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
+json.dump({'v': datetime.date.today().isoformat(), 'src': 'MIMIT', 'b': brands, 's': out}, open('data/fuel_it.json', 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
 print('impianti:', len(out), 'marchi:', len(brands))
