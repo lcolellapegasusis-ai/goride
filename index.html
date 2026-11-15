@@ -150,6 +150,7 @@ select{width:100%;background:var(--inp);color:var(--tx);border:1px solid var(--l
       <button id="swap">⇅ Inverti</button>
       <label class="file">📂 Importa GPX/KML<input type="file" id="gpxIn"></label>
       <button id="gmBtn">🔗 Da Google Maps</button>
+      <button id="passBtn">🏔️ Passi di montagna</button>
     </div>
     <div id="gmBox" style="display:none;margin-bottom:10px">
       <input type="text" id="gmUrl" placeholder="Incolla qui il link del percorso Google Maps">
@@ -192,7 +193,7 @@ select{width:100%;background:var(--inp);color:var(--tx);border:1px solid var(--l
 
   <div class="foot">
     Mappe © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · Percorsi: Valhalla (profilo moto, server FOSSGIS) e OSRM (Open Source Routing Machine) · Ricerca luoghi: Photon · Meteo: <a href="https://open-meteo.com/">Open-Meteo</a> (modelli ECMWF/ICON/GFS).<br>
-    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">Versione 15 nov 2026 · 22:30 (soste rosse/azzurre, anello, passi, strada bloccata, 4 contatti)</b>
+    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">Versione 15 nov 2026 · rilascio 7 (elenco passi di montagna)</b>
   </div>
 </main>
 </div>
@@ -1089,6 +1090,56 @@ $('#gpxIn').addEventListener('change',async e=>{
 });
 function setStopsFrom(pts){S.mode='route';S.routes=[];S.stops=pts.map(p=>({p:{lat:p.lat,lon:p.lon,name:p.name},text:p.name}));renderStops();}
 
+/* ================= elenco passi di montagna → tappa ================= */
+const PASS_AREAS=[['route','Lungo il percorso calcolato (entro 30 km)'],['near','Vicino alla zona della mappa (80 km)'],
+ ['IT-65','Abruzzo'],['IT-67','Molise'],['IT-62','Lazio'],['IT-57','Marche'],['IT-55','Umbria'],['IT-52','Toscana'],['IT-45','Emilia-Romagna'],['IT-42','Liguria'],
+ ['IT-21','Piemonte'],['IT-23','Valle d’Aosta'],['IT-25','Lombardia'],['IT-32','Trentino-Alto Adige'],['IT-34','Veneto'],['IT-36','Friuli-Venezia Giulia'],
+ ['IT-72','Campania'],['IT-77','Basilicata'],['IT-78','Calabria'],['IT-75','Puglia'],['IT-82','Sicilia'],['IT-88','Sardegna'],
+ ['CH','Svizzera'],['AT','Austria'],['FR','Francia'],['SI','Slovenia'],['DE','Germania'],['ES','Spagna']];
+const PASSC={};
+async function loadPasses(area){
+  if(PASSC[area])return PASSC[area];
+  const road='["highway"~"^(motorway|trunk|primary|secondary|tertiary|unclassified|residential)$"]';
+  let src;
+  if(area==='route'){const r=S.routes[S.sel];if(!r)throw new Error('calcola prima un percorso');const n=Math.min(200,Math.max(10,Math.round(r.len/20000)));
+    src=`node(around:30000,${Array.from({length:n+1},(_,k)=>pointAtKm(r,r.len/1000*k/n)).map(p=>p[0].toFixed(4)+','+p[1].toFixed(4)).join(',')})["mountain_pass"="yes"]->.p;`;}
+  else if(area==='near'){const c=map.getCenter();src=`node(around:80000,${c.lat.toFixed(4)},${c.lng.toFixed(4)})["mountain_pass"="yes"]->.p;`;}
+  else src=`area["${area.length===2?'ISO3166-1':'ISO3166-2'}"="${area}"]${area.length===2?'["admin_level"="2"]':''}->.a;node(area.a)["mountain_pass"="yes"]->.p;`;
+  const q=`[out:json][timeout:90];${src}way(bn.p)${road}->.w;node.p(w.w)["name"];out body 1500;`;
+  const res=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:'data='+encodeURIComponent(q),headers:{'Content-Type':'application/x-www-form-urlencoded'}});
+  const j=await res.json();
+  const out=(j.elements||[]).map(e=>({name:e.tags.name,ele:parseFloat(e.tags.ele)||null,p:[e.lat,e.lon],key:'n'+e.id}));
+  PASSC[area]=out;return out;
+}
+function bestInsert(p){ // posizione della tappa che allunga meno il giro
+  const st=S.stops;let best=st.length-1,bd=Infinity;
+  for(let i=1;i<st.length;i++){const a=st[i-1].p,b=st[i].p;if(!a||!b)continue;const A=[a.lat,a.lon],B=[b.lat,b.lon];const d=hav(A,p)+hav(p,B)-hav(A,B);if(d<bd){bd=d;best=i;}}
+  return best;
+}
+function openPasses(){
+  const sh=$('#poiSheet');const last=LS.get('motorotta_pass_area',S.routes.length?'route':'near');
+  sh.innerHTML=`<div class="sheet"><div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">🏔️ Passi di montagna</h3><button id="psX" class="ib">✕</button></div>
+   <label class="fld">Zona<select id="psArea">${PASS_AREAS.map(a=>`<option value="${a[0]}" ${a[0]===last?'selected':''}>${a[1]}</option>`).join('')}</select></label>
+   <div class="grid2"><input type="text" id="psQ" placeholder="Cerca per nome…"><select id="psSort"><option value="ele">Più alti prima</option><option value="name">A → Z</option><option value="near">Più vicini al percorso</option></select></div>
+   <div class="mut" style="margin:6px 0">Solo passi su strade asfaltate percorribili. Tocca un passo per inserirlo come tappa.</div>
+   <div id="psList"><div class="empty">Caricamento…</div></div></div>`;
+  sh.classList.add('on');
+  $('#psX').onclick=()=>sh.classList.remove('on');
+  const draw=()=>{const L0=PASSC[$('#psArea').value]||[];const q=$('#psQ').value.trim().toLowerCase();const so=$('#psSort').value;const r=S.routes[S.sel];
+    let L1=L0.filter(x=>!q||x.name.toLowerCase().includes(q));
+    if(so==='ele')L1.sort((a,b)=>(b.ele||0)-(a.ele||0));else if(so==='name')L1.sort((a,b)=>a.name.localeCompare(b.name,'it'));
+    else if(r){L1.forEach(x=>x._d=projKm(r,x.p).d);L1.sort((a,b)=>a._d-b._d);}
+    $('#psList').innerHTML=L1.length?L1.slice(0,300).map(x=>`<div class="sv" data-ps="${x.key}" style="cursor:pointer"><div style="font-size:20px">🏔️</div><div class="n"><b>${esc(x.name)}</b><div class="mut">${x.ele?Math.round(x.ele)+' m s.l.m.':'quota n.d.'}${r?' · '+(projKm(r,x.p).d/1000).toFixed(1)+' km dal percorso':''}</div></div><span style="color:var(--acc);font-weight:700">➕</span></div>`).join('')
+      :'<div class="empty">Nessun passo trovato.</div>';
+    $('#psList').querySelectorAll('[data-ps]').forEach(e=>e.onclick=()=>{const x=L1.find(y=>y.key===e.dataset.ps);
+      const i=bestInsert(x.p);S.stops.splice(i,0,{p:{lat:x.p[0],lon:x.p[1],name:x.name+(x.ele?' ('+Math.round(x.ele)+' m)':'')},text:x.name});
+      renderStops();sh.classList.remove('on');try{map.setView(x.p,11);}catch(err){}toast('🏔️ '+x.name+' aggiunto come tappa: ricalcola il percorso');window.scrollTo({top:0,behavior:'smooth'});});};
+  const load=async()=>{const a=$('#psArea').value;LS.set('motorotta_pass_area',a);$('#psList').innerHTML='<div class="empty">⏳ Carico i passi…</div>';
+    try{await loadPasses(a);draw();}catch(e){$('#psList').innerHTML=`<div class="empty">Non riesco a caricare i passi (${esc(e.message||'rete')}). Riprova.</div>`;}};
+  $('#psArea').onchange=load;$('#psQ').oninput=draw;$('#psSort').onchange=draw;load();
+}
+$('#passBtn').onclick=openPasses;
+
 /* ================= import da link Google Maps ================= */
 $('#gmBtn').onclick=()=>{const b=$('#gmBox');b.style.display=b.style.display==='none'?'block':'none';if(b.style.display==='block')$('#gmUrl').focus();};
 $('#gmClose').onclick=()=>{$('#gmBox').style.display='none';};
@@ -1901,7 +1952,7 @@ function projKm(r,p){ // distanza dal percorso e km lungo il percorso
   const c=r.coords,k=Math.cos(p[0]*rad)*111320;let best={d:Infinity,i:0,t:0};
   for(let i=0;i<c.length-1;i++){
     const ax=(c[i][1]-p[1])*k,ay=(c[i][0]-p[0])*111320,bx=(c[i+1][1]-p[1])*k,by=(c[i+1][0]-p[0])*111320;
-    if(Math.min(Math.abs(ax),Math.abs(bx))>3000&&Math.sign(ax)===Math.sign(bx))continue;
+    if(Math.min(Math.abs(ax),Math.abs(bx))>best.d&&Math.sign(ax)===Math.sign(bx))continue;
     const dx=bx-ax,dy=by-ay,L2=dx*dx+dy*dy;let t=L2?-(ax*dx+ay*dy)/L2:0;t=Math.max(0,Math.min(1,t));
     const d=Math.hypot(ax+t*dx,ay+t*dy);if(d<best.d)best={d,i,t};}
   best.km=(r.cum[best.i]+(r.cum[best.i+1]-r.cum[best.i])*best.t)/1000;return best;
