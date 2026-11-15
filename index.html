@@ -137,6 +137,7 @@ select{width:100%;background:#0f1218;color:var(--tx);border:1px solid var(--line
     <div class="opts">
       <label class="fld" style="display:block;margin-top:0">Tipo di percorso<select id="routeMode">
         <option value="fast">⚡ Più veloce (anche autostrade)</option>
+        <option value="mixed">⚖️ Misto (autostrade solo dove convengono)</option>
         <option value="nohw">🛣️ Senza autostrade</option>
         <option value="curvy">🌀 Con più curve (panoramico)</option>
         <option value="xcurvy">🌀🌀 Massime curve (deviazioni più lunghe)</option>
@@ -161,7 +162,7 @@ select{width:100%;background:#0f1218;color:var(--tx);border:1px solid var(--line
   <section class="tab" id="tab-saved"></section>
 
   <div class="foot">
-    Mappe © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · Percorsi: OSRM (Open Source Routing Machine) · Ricerca luoghi: Photon · Meteo: <a href="https://open-meteo.com/">Open-Meteo</a> (modelli ECMWF/ICON/GFS).<br>
+    Mappe © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · Percorsi: Valhalla (profilo moto, server FOSSGIS) e OSRM (Open Source Routing Machine) · Ricerca luoghi: Photon · Meteo: <a href="https://open-meteo.com/">Open-Meteo</a> (modelli ECMWF/ICON/GFS).<br>
     Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.
   </div>
 </main>
@@ -403,9 +404,32 @@ async function osrm(pts,alts,exclude){
   return j.routes.map(rt=>{const names=new Set();(rt.legs||[]).forEach(l=>(l.steps||[]).forEach(st=>{[st.name,st.ref].forEach(n=>{if(n)String(n).split(/[;,]/).forEach(x=>{x=x.trim().toLowerCase();if(x)names.add(x);});});}));
     return {coords:rt.geometry.coordinates.map(c=>[c[1],c[0]]),dist:rt.distance,dur:rt.duration,names:[...names]};});
 }
-async function routeSafe(pts,alts,excl){
-  if(excl){try{return {rs:await osrm(pts,alts,excl),ex:true};}catch(e){console.warn('exclude non supportato',e);}}
-  return {rs:await osrm(pts,alts,null),ex:false};
+/* motore principale: Valhalla (FOSSGIS, gratuito) con profilo MOTO e preferenza autostrade regolabile */
+let ROUTE_PREF={hw:0,toll:false};
+function decPoly(str,prec){const f=Math.pow(10,prec||6);let i=0,lat=0,lng=0;const out=[];
+  while(i<str.length){let b,sh=0,r=0;do{b=str.charCodeAt(i++)-63;r|=(b&31)<<sh;sh+=5;}while(b>=32);lat+=(r&1)?~(r>>1):(r>>1);
+    sh=0;r=0;do{b=str.charCodeAt(i++)-63;r|=(b&31)<<sh;sh+=5;}while(b>=32);lng+=(r&1)?~(r>>1):(r>>1);out.push([lat/f,lng/f]);}
+  return out;}
+function vTrip(t){const coords=[];const names=new Set();
+  (t.legs||[]).forEach((l,k)=>{const c=decPoly(l.shape,6);coords.push(...(k?c.slice(1):c));
+    (l.maneuvers||[]).forEach(m=>(m.street_names||[]).forEach(n=>String(n).split(/[;,]/).forEach(x=>{x=x.trim().toLowerCase();if(x)names.add(x);})));});
+  return {coords,dist:(t.summary.length||0)*1000,dur:t.summary.time||0,names:[...names]};}
+async function valhalla(pts,alts,pref){
+  const q={locations:pts.map((p,i)=>({lat:+p[0].toFixed(6),lon:+p[1].toFixed(6),type:(i===0||i===pts.length-1)?'break':'through'})),
+    costing:'motorcycle',costing_options:{motorcycle:{use_highways:pref.hw,use_tolls:pref.toll?0:0.5,use_trails:0,use_ferry:0.3}},
+    units:'kilometers',language:'it-IT',directions_options:{units:'kilometers',language:'it-IT'}};
+  if(alts&&pts.length===2)q.alternates=2;
+  const ctl=new AbortController();const tm=setTimeout(()=>ctl.abort(),25000);
+  try{const r=await fetch('https://valhalla1.openstreetmap.de/route?json='+encodeURIComponent(JSON.stringify(q)),{signal:ctl.signal});
+    const j=await r.json();if(!j.trip)throw new Error(j.error||'percorso non trovato');
+    return [vTrip(j.trip),...(j.alternates||[]).map(a=>vTrip(a.trip))];}
+  finally{clearTimeout(tm);}
+}
+async function routeSafe(pts,alts,excl,pref){
+  pref=pref||ROUTE_PREF;
+  try{return {rs:await valhalla(pts,alts,pref),ex:true,engine:'valhalla'};}catch(e){console.warn('Valhalla non disponibile',e);}
+  if(excl){try{return {rs:await osrm(pts,alts,excl),ex:true,engine:'osrm'};}catch(e){console.warn('exclude non supportato',e);}}
+  return {rs:await osrm(pts,alts,null),ex:!excl,engine:'osrm'};
 }
 function curvature(c,L){
   const pts=[c[0]];let acc=0;
@@ -526,9 +550,10 @@ async function calc(){
       renderStops();
       const mode=$('#routeMode').value,m=MODES[mode];LS.set('motorotta_mode',mode);
       const ex=[m.ex?'motorway':null,$('#optToll').checked?'toll':null].filter(Boolean).join(',');
+      ROUTE_PREF={hw:m.hw,toll:$('#optToll').checked};
       status('Calcolo i percorsi…');
       const base=await routeSafe(pts,pts.length===2,ex);
-      if(ex&&!base.ex)toast('Esclusione autostrade non disponibile: percorso standard');
+      if(!base.ex)toast(m.hw<1?'Servizio moto non raggiungibile: percorso standard (può includere autostrade)':'Servizio moto non raggiungibile: percorso standard');
       let routes=base.rs.map((r,i)=>({...r,label:i===0?m.label:'Alternativa '+i}));
       if(m.curvy){
         const legs=[];let changed=0;const nL=pts.length-1;
@@ -542,7 +567,7 @@ async function calc(){
         else toast('Nessuna strada più curvosa trovata entro la deviazione ammessa');
       }
       if(mode!=='fast'){
-        try{await sleep(250);const f=(await routeSafe(pts,false,$('#optToll').checked?'toll':null)).rs[0];routes.push({...f,label:'⚡ Più veloce (anche autostrade)'});}catch(e){}
+        try{await sleep(250);const f=(await routeSafe(pts,false,$('#optToll').checked?'toll':null,{hw:1,toll:$('#optToll').checked})).rs[0];routes.push({...f,label:'⚡ Più veloce (anche autostrade)'});}catch(e){}
       }
       routes=routes.filter((r,i,a)=>a.findIndex(o=>Math.abs(o.dist-r.dist)/r.dist<0.015)===i);
       S.routes=routes;
@@ -559,10 +584,11 @@ async function calc(){
 
 /* ================= tipi di percorso ================= */
 const MODES={
-  fast:{ex:false,label:'⚡ Più veloce'},
-  nohw:{ex:true,label:'🛣️ Senza autostrade'},
-  curvy:{ex:true,label:'Senza autostrade (più diretto)',curvy:true,curvyLabel:'🌀 Più curve',offs:[0.2,-0.2],detour:1.6},
-  xcurvy:{ex:true,label:'Senza autostrade (più diretto)',curvy:true,curvyLabel:'🌀🌀 Massime curve',offs:[0.2,-0.2,0.35,-0.35],detour:2.1}};
+  fast:{ex:false,hw:1,label:'⚡ Più veloce'},
+  mixed:{ex:false,hw:0.5,label:'⚖️ Misto'},
+  nohw:{ex:true,hw:0,label:'🛣️ Senza autostrade'},
+  curvy:{ex:true,hw:0,label:'Senza autostrade (più diretto)',curvy:true,curvyLabel:'🌀 Più curve',offs:[0.2,-0.2],detour:1.6},
+  xcurvy:{ex:true,hw:0,label:'Senza autostrade (più diretto)',curvy:true,curvyLabel:'🌀🌀 Massime curve',offs:[0.2,-0.2,0.35,-0.35],detour:2.1}};
 const lenOf=c=>{let L=0;for(let i=1;i<c.length;i++)L+=hav(c[i-1],c[i]);return L;};
 function joinLegs(legs){const coords=[];let dist=0,dur=0;const names=new Set();
   legs.forEach((l,k)=>{coords.push(...(k?l.coords.slice(1):l.coords));dist+=l.dist;dur+=l.dur;(l.names||[]).forEach(n=>names.add(n));});
@@ -1296,6 +1322,7 @@ async function navRecalc(pos,toStop){ // ricalcolo dalla posizione attuale verso
   try{
     const mode=LS.get('motorotta_mode','curvy');const m=MODES[mode]||MODES.curvy;
     const ex=[m.ex?'motorway':null,$('#optToll').checked?'toll':null].filter(Boolean).join(',');
+    ROUTE_PREF={hw:m.hw,toll:$('#optToll').checked};
     navStatus('🔄 Ricalcolo verso '+esc(n.name)+'…','#4a3a12');
     const r=(await routeSafe([pos,[n.p.lat,n.p.lon]],false,ex)).rs[0];
     const tail=NAV.coords.slice((n.ci||0)+1);
