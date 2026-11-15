@@ -112,6 +112,7 @@ select{width:100%;background:#0f1218;color:var(--tx);border:1px solid var(--line
 .askbox{background:#221a12;border:2px solid var(--acc);border-radius:16px;padding:14px;text-align:center;font-size:16px}
 .askbox button{padding:16px;font-size:17px;border-radius:12px}
 .navbtn{display:block;text-align:center;background:#232833;border:1px solid var(--line);border-radius:10px;padding:10px;color:var(--tx);text-decoration:none;font-size:14px}
+.car .motoOnly{display:none!important}
 </style>
 </head>
 <body>
@@ -135,6 +136,7 @@ select{width:100%;background:#0f1218;color:var(--tx);border:1px solid var(--line
     </div>
     <label class="fld">Data e ora di partenza<input type="datetime-local" id="dep"></label>
     <div class="opts">
+      <label class="fld" style="display:block;margin-top:0">Veicolo<select id="vehSel"></select></label>
       <label class="fld" style="display:block;margin-top:0">Tipo di percorso<select id="routeMode">
         <option value="fast">⚡ Più veloce (anche autostrade)</option>
         <option value="mixed">⚖️ Misto (autostrade solo dove convengono)</option>
@@ -184,13 +186,13 @@ select{width:100%;background:#0f1218;color:var(--tx);border:1px solid var(--line
     <button id="navStop" style="width:100%;margin-top:8px">⏹ Termina navigazione</button>
   </div>
   <div class="card">
-    <svg class="gauge" viewBox="0 0 300 165">
+    <div class="motoOnly"><svg class="gauge" viewBox="0 0 300 165">
       <path d="M30 150 A120 120 0 0 1 270 150" fill="none" stroke="#2a2f3a" stroke-width="14" stroke-linecap="round"/>
       <g id="ticks"></g>
       <g id="needle" transform="rotate(0 150 150)"><line x1="150" y1="150" x2="150" y2="42" stroke="#ff7a1a" stroke-width="6" stroke-linecap="round"/><circle cx="150" cy="150" r="10" fill="#ff7a1a"/></g>
     </svg>
     <div class="big" id="leanVal">0°</div>
-    <div class="lr"><span>◀ SX max <b id="mxL">0°</b></span><span id="leanDir" style="color:var(--tx)">—</span><span>DX max <b id="mxR">0°</b> ▶</span></div>
+    <div class="lr"><span>◀ SX max <b id="mxL">0°</b></span><span id="leanDir" style="color:var(--tx)">—</span><span>DX max <b id="mxR">0°</b> ▶</span></div></div>
     <div class="grid3">
       <div class="kpi c"><span class="mut">Velocità</span><b id="spdVal">0</b><span class="mut">km/h</span></div>
       <div class="kpi c"><span class="mut">Forza G</span><b id="gVal">0.00</b><span class="mut">g</span></div>
@@ -204,7 +206,7 @@ select{width:100%;background:#0f1218;color:var(--tx);border:1px solid var(--line
     </div>
     <div class="grid2" style="margin-top:8px">
       <div class="kpi c"><span class="mut">🌡️ Esterna</span><b id="tOut">–</b></div>
-      <div class="kpi c"><span class="mut">🏍️ In sella</span><b id="tFeel" style="color:#ff7a1a">–</b></div>
+      <div class="kpi c motoOnly"><span class="mut">🏍️ In sella</span><b id="tFeel" style="color:#ff7a1a">–</b></div>
     </div>
     <div class="mut" id="sensorInfo" style="margin-top:8px;text-align:center"></div>
   </div>
@@ -227,13 +229,23 @@ select{width:100%;background:#0f1218;color:var(--tx);border:1px solid var(--line
 
 <!-- ============ IMPOSTAZIONI ============ -->
 <div id="view-set" class="view"><main>
-  <div class="card"><h3>🏍️ La mia moto</h3>
-    <label class="fld">Tipo di moto<select id="motoType"></select></label>
-    <label class="fld">Capacità serbatoio (litri)<input type="number" id="motoTank" step="0.1" min="3" max="40" inputmode="decimal"></label>
-    <label class="fld">Autonomia con il pieno (km)<input type="number" id="motoAuto" step="5" min="50" max="900" inputmode="numeric"></label>
-    <label class="fld">Autonomia minima da conservare (km) – margine se un distributore è chiuso<input type="number" id="motoMargin" step="10" min="20" max="200" inputmode="numeric"></label>
-    <label class="fld">Prezzo benzina (€/litro)<input type="number" id="motoPrice" step="0.01" min="0.5" max="4" inputmode="decimal"></label>
-    <div class="note" id="consInfo"></div>
+  <div class="card"><h3>🏍️🚗 Il mio garage</h3><div id="garageList"></div>
+    <button id="vehAdd" style="width:100%;margin-top:8px">＋ Aggiungi veicolo</button>
+    <div id="vehForm" style="display:none;margin-top:10px;border-top:1px solid var(--line);padding-top:8px">
+      <label class="fld">Tipo<select id="vfKind"><option value="moto">🏍️ Moto</option><option value="auto">🚗 Auto</option><option value="altro">🚐 Altro (furgone, camper…)</option></select></label>
+      <label class="fld">Marca<select id="vfBrand"></select></label>
+      <label class="fld">Modello<select id="vfModel"></select></label>
+      <label class="fld">Nome (come lo vuoi vedere)<input type="text" id="vfName"></label>
+      <label class="fld">Carburante<select id="vfFuel"><option value="benzina">Benzina</option><option value="diesel">Diesel</option><option value="gpl">GPL</option><option value="metano">Metano</option></select></label>
+      <label class="fld">Serbatoio (litri; kg per il metano)<input type="number" id="vfTank" step="0.1" inputmode="decimal"></label>
+      <label class="fld">Autonomia con il pieno (km)<input type="number" id="vfAuto" step="5" inputmode="numeric"></label>
+      <label class="fld">Autonomia minima da conservare (km)<input type="number" id="vfMargin" step="10" inputmode="numeric"></label>
+      <label class="fld">Prezzo carburante (€/l, €/kg per il metano)<input type="number" id="vfPrice" step="0.01" inputmode="decimal"></label>
+      <div class="note">I dati dell’elenco sono indicativi: correggili con quelli del libretto o del cruscotto.</div>
+      <div class="grid2" style="margin-top:8px"><button id="vfSave" class="okb" style="padding:11px;border-radius:10px">Salva veicolo</button><button id="vfCancel">Annulla</button></div>
+      <button id="vfDel" style="width:100%;margin-top:8px;display:none">🗑️ Elimina veicolo</button>
+    </div>
+    <div class="note" id="consInfo" style="margin-top:8px"></div>
   </div>
   <div class="card"><h3>Contatto di emergenza</h3>
     <label class="fld">Nome<input type="text" id="emName" placeholder="es. Mario"></label>
@@ -416,7 +428,7 @@ function vTrip(t){const coords=[];const names=new Set();
   return {coords,dist:(t.summary.length||0)*1000,dur:t.summary.time||0,names:[...names]};}
 async function valhalla(pts,alts,pref){
   const q={locations:pts.map((p,i)=>({lat:+p[0].toFixed(6),lon:+p[1].toFixed(6),type:(i===0||i===pts.length-1)?'break':'through'})),
-    costing:'motorcycle',costing_options:{motorcycle:{use_highways:pref.hw,use_tolls:pref.toll?0:0.5,use_trails:0,use_ferry:0.3}},
+    costing:isMoto()?'motorcycle':'auto',costing_options:{[isMoto()?'motorcycle':'auto']:Object.assign({use_highways:pref.hw,use_tolls:pref.toll?0:0.5,use_ferry:0.3},isMoto()?{use_trails:0}:{})},
     units:'kilometers',language:'it-IT',directions_options:{units:'kilometers',language:'it-IT'}};
   if(alts&&pts.length===2)q.alternates=2;
   const ctl=new AbortController();const tm=setTimeout(()=>ctl.abort(),25000);
@@ -497,7 +509,13 @@ function sunPos(ms,lat,lon){
   const az=Math.atan2(-Math.sin(H),Math.tan(dec)*Math.cos(la)-Math.sin(la)*Math.cos(H));
   return {el:el/rad,az:(az/rad+360)%360};
 }
+function carScore(w,glare,ice){ // in auto pioggia, vento e freddo pesano meno
+  let s=100;s-=Math.min(25,w.pr*8);if(w.wg>65)s-=Math.min(25,(w.wg-65));
+  if(w.vis!=null&&w.vis<2000)s-=w.vis<500?25:12;if([95,96,99].includes(w.code))s-=20;if([71,73,75,77,85,86].includes(w.code))s-=35;
+  if(glare)s-=6;if(ice)s-=35;if(w.sd>=0.02)s-=15;return Math.max(0,Math.round(s));
+}
 function pointScore(w,feel,glare,ice){
+  if(!isMoto())return carScore(w,glare,ice);
   let s=100;
   s-=Math.min(45,w.pr*18);
   if(w.pp>30)s-=(w.pp-30)*0.25;
@@ -516,7 +534,7 @@ function evalRoute(rt,dep){
   for(const s of rt.samples){
     const t=dep+rt.dur*1000*(s.d/rt.len);const w=wxAt(s.key,t);
     if(!w){missing=true;pts.push({...s,t,w:null});continue;}
-    const feel=rideFeel(w.temp,V);const sun=sunPos(t,s.p[0],s.p[1]);
+    const feel=isMoto()?rideFeel(w.temp,V):w.temp;const sun=sunPos(t,s.p[0],s.p[1]);
     let dAz=Math.abs(sun.az-s.hd);if(dAz>180)dAz=360-dAz;
     const glare=sun.el>0&&sun.el<15&&dAz<30;
     const ice=(w.temp<=3&&(w.pr>0||w.rh>=92))||w.temp<=0.5||(w.sd>0.005&&w.temp<=2);
@@ -779,9 +797,9 @@ function renderRoutes(){
      <div style="flex:1"><b>${kind==='p'?'Sosta '+x.n:'Emergenza'}${x.synthetic?'':': '+esc(x.name)}</b>${x.synthetic?' <span style="color:var(--r)">– nessun distributore trovato qui</span>':''}
      <div class="mut">km ${Math.round(x.km)} · ~${fmtT(x.t)} · autonomia all’arrivo <b style="color:${kind==='p'&&x.rangeArr<fp.M?'var(--r)':'inherit'}">${Math.round(x.rangeArr)} km</b>${x.off>100?' · '+x.off+' m dal percorso':''}${x.h24?' · 24h/self':x.oh?' · orari: '+esc(x.oh):''}</div>
      <a href="${x.synthetic?gasUrl(x.p):navToUrl(x.p)}" target="_blank" rel="noopener" style="color:var(--acc);font-size:13px">${x.synthetic?'cerca distributori in zona':'portami qui'}</a></div></div>`;
-  h+=`<div class="card"><h3>⛽ Carburante e soste</h3><div class="grid2">
+  h+=`<div class="card"><h3>⛽ Carburante e soste · ${KIND_IC[V().kind]||''} ${esc(V().name)} (${esc(V().fuel)})</h3>${['gpl','metano'].includes(V().fuel)?'<div class="note" style="color:var(--y)">Distributori '+(V().fuel==='gpl'?'GPL':'metano')+': i dati della mappa sono meno completi, verifica prima di partire.</div>':''}<div class="grid2">
     <div class="kpi"><span class="mut">Consumo previsto</span><b>${fp.need.toFixed(1)} litri</b><span class="mut">${fp.c.toFixed(1)} l/100 km ${fp.eff?'(dai tuoi pieni)':''}</span></div>
-    <div class="kpi"><span class="mut">Costo stimato</span><b>€ ${fp.cost.toFixed(2)}</b><span class="mut">a ${(+SET.moto.price||0).toFixed(2)} €/l</span></div>
+    <div class="kpi"><span class="mut">Costo stimato</span><b>€ ${fp.cost.toFixed(2)}</b><span class="mut">a ${(+SET.moto.price||0).toFixed(2)} €/${V().fuel==='metano'?'kg':'l'}</span></div>
     <div class="kpi"><span class="mut">Autonomia ora</span><b>${Math.round(fp.range)} km</b><span class="mut">pieno: ${Math.round(fp.full)} km</span></div>
     <div class="kpi"><span class="mut">Soste</span><b>${fp.stops.length}</b><span class="mut">${fp.stops.length?'+'+fp.stops.length*10+' min circa':'non servono'} · arrivo con ${Math.round(fp.endRange)} km</span></div></div>
     ${S.fuelState==='loading'?'<div class="mut" style="margin-top:8px">⏳ Cerco i distributori lungo il percorso…</div>':''}
@@ -830,7 +848,7 @@ function renderMeteo(){
   if(!r){box.innerHTML='<div class="card empty">Nessun percorso calcolato.</div>';return;}
   const ev=S.ev[S.sel];const v=ev.pts.filter(p=>p.w);
   if(!v.length){box.innerHTML='<div class="card empty">Previsioni non disponibili per l’orario scelto (massimo 4 giorni avanti).</div>';return;}
-  const {g,minF,maxF}=gearAdvice(v);
+  const moto=isMoto();const {g,minF,maxF}=gearAdvice(v);
   const maxG=Math.max(...v.map(p=>p.w.wg)),totR=v.some(p=>p.w.pr>=0.1);
   const minT=Math.min(...v.map(p=>p.w.temp)),maxT=Math.max(...v.map(p=>p.w.temp));
   let h=`<div class="card"><h3>${esc(r.label)} · partenza ${fmtDT(S.dep)}</h3>
@@ -838,15 +856,15 @@ function renderMeteo(){
     <div class="kpi"><span class="mut">Punteggio</span><b style="color:${scCol(ev.score)}">${ev.score}/100</b></div>
     <div class="kpi"><span class="mut">Raffiche max</span><b>${Math.round(maxG)} km/h</b></div>
     <div class="kpi"><span class="mut">🌡️ Esterna (min–max)</span><b>${Math.round(minT)}° – ${Math.round(maxT)}°C</b></div>
-    <div class="kpi"><span class="mut">🏍️ Percepita in sella</span><b style="color:#ff7a1a">${Math.round(minF)}° – ${Math.round(maxF)}°C</b></div>
+    ${moto?`<div class="kpi"><span class="mut">🏍️ Percepita in sella</span><b style="color:#ff7a1a">${Math.round(minF)}° – ${Math.round(maxF)}°C</b></div>`:''}
     <div class="kpi"><span class="mut">Pioggia</span><b>${totR?'Sì':'No'}</b></div>
-    <div class="kpi"><span class="mut">Differenza max</span><b>−${Math.round(Math.max(...v.map(p=>p.w.temp-p.feel)))}°C</b><span class="mut">effetto del vento</span></div>
-   </div></div>
+    ${moto?`<div class="kpi"><span class="mut">Differenza max</span><b>−${Math.round(Math.max(...v.map(p=>p.w.temp-p.feel)))}°C</b><span class="mut">effetto del vento</span></div>`:''}
+   </div></div>`+(moto?`
   <div class="card"><h3>🌡️ Esterna vs percepita in sella</h3>
    <table style="width:100%;border-collapse:collapse;font-size:13px"><tr class="mut"><td>km</td><td>ora</td><td>esterna</td><td>in sella</td><td>diff.</td></tr>
    ${v.filter((p,i)=>i%Math.max(1,Math.round(v.length/8))===0||i===v.length-1).map(p=>`<tr style="border-top:1px solid var(--line)"><td style="padding:6px 0">${Math.round(p.d/1000)}</td><td>${fmtT(p.t)}</td><td>${Math.round(p.w.temp)}°</td><td style="color:#ff7a1a;font-weight:700">${Math.round(p.feel)}°</td><td class="mut">${Math.round(p.feel-p.w.temp)}°</td></tr>`).join('')}
    </table>
-   <div class="note" style="margin-top:6px">La temperatura percepita in sella tiene conto del vento generato dalla velocità di marcia (circa ${Math.round(Math.min(110,Math.max(40,r.len/r.dur*3.6*1.1)))} km/h su questo percorso): con la stessa temperatura esterna, in moto si sente più freddo.</div></div>`;
+   <div class="note" style="margin-top:6px">La temperatura percepita in sella tiene conto del vento generato dalla velocità di marcia (circa ${Math.round(Math.min(110,Math.max(40,r.len/r.dur*3.6*1.1)))} km/h su questo percorso): con la stessa temperatura esterna, in moto si sente più freddo.</div></div>`:'');
   const al=[];
   ranges(ev.pts,p=>p.w.pr>=0.2||[95,96,99].includes(p.w.code)).forEach(x=>{const mx=Math.max(...x.ps.map(p=>p.w.pr));al.push(`🌧️ Pioggia ${rng(x)}, fino a ${mx.toFixed(1)} mm/h`);});
   ranges(ev.pts,p=>p.w.pp>=50&&p.w.pr<0.2).forEach(x=>al.push(`🌦️ Probabilità di pioggia alta ${rng(x)}`));
@@ -856,16 +874,16 @@ function renderMeteo(){
   ranges(ev.pts,p=>p.w.vis!=null&&p.w.vis<1500).forEach(x=>al.push(`🌫️ Visibilità ridotta ${rng(x)}`));
   ranges(ev.pts,p=>p.glare).forEach(x=>al.push(`😎 Sole basso in faccia ${rng(x)}`));
   ranges(ev.pts,p=>p.night).forEach(x=>al.push(`🌙 Guida al buio ${rng(x)}`));
-  ranges(ev.pts,p=>p.feel<5).forEach(x=>al.push(`🥶 Freddo intenso in sella ${rng(x)}`));
+  if(moto)ranges(ev.pts,p=>p.feel<5).forEach(x=>al.push(`🥶 Freddo intenso in sella ${rng(x)}`));
   ranges(ev.pts,p=>p.w.sd>=0.01).forEach(x=>al.push(`🏔️ <b>Neve al suolo</b> nella zona ${rng(x)}, fino a ${Math.round(Math.max(...x.ps.map(p=>p.w.sd))*100)} cm: possibile neve ai bordi o sulla carreggiata`));
   ranges(ev.pts,p=>p.w.sf>0.2).forEach(x=>al.push(`🌨️ Nevicata prevista ${rng(x)}`));
   (r.closures||[]).forEach(c=>al.push(closureTxt(c)));
   if(r.closures===undefined&&S.closState==='loading')al.push('⏳ Controllo chiusure e lavori sul percorso in corso…');
   if(ev.missing)al.push('⚠️ Parte del viaggio è oltre l’orizzonte delle previsioni (4 giorni).');
   h+=`<div class="card"><h3>Avvisi di sicurezza</h3><ul class="al">${al.length?al.map(a=>'<li>'+a+'</li>').join(''):'<li>✅ Nessuna criticità rilevata lungo il percorso.</li>'}</ul></div>`;
-  h+=`<div class="card"><h3>Cosa indossare</h3><ul class="al">${g.map(x=>'<li>'+x+'</li>').join('')}</ul></div>`;
+  if(moto)h+=`<div class="card"><h3>Cosa indossare</h3><ul class="al">${g.map(x=>'<li>'+x+'</li>').join('')}</ul></div>`;
   h+=`<div class="card"><h3>Lungo il percorso</h3>
-    <div class="mut">Temperatura: esterna (blu) e percepita in sella (arancio), °C</div>${chart(v,[{f:p=>p.w.temp,c:'#5aa9ff'},{f:p=>p.feel,c:'#ff7a1a'}],'line')}
+    <div class="mut">${moto?'Temperatura: esterna (blu) e percepita in sella (arancio), °C':'Temperatura esterna, °C'}</div>${chart(v,moto?[{f:p=>p.w.temp,c:'#5aa9ff'},{f:p=>p.feel,c:'#ff7a1a'}]:[{f:p=>p.w.temp,c:'#5aa9ff'}],'line')}
     <div class="mut">Pioggia mm/h (barre) e probabilità % (linea)</div>${chart(v,[{f:p=>p.w.pr,c:'#5aa9ff',bar:true},{f:p=>p.w.pp,c:'#9aa3b2',scale:100}],'mix')}
     <div class="mut">Vento medio e raffiche, km/h</div>${chart(v,[{f:p=>p.w.ws,c:'#9aa3b2'},{f:p=>p.w.wg,c:'#eb5757'}],'line')}
     <div class="mut">Altitudine, m</div>${chart(v,[{f:p=>p.w.elev,c:'#3ecf6e'}],'line')}
@@ -1067,26 +1085,95 @@ function showTab(t){document.querySelectorAll('.tabs button').forEach(b=>b.class
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{showTab(b.dataset.tab);if(b.dataset.tab==='saved')renderSaved();});
 
 /* ================= impostazioni ================= */
-const MOTO_TYPES=[
-  {k:'hd_sg',n:'Harley-Davidson Street Glide',tank:22.7,auto:345},
-  {k:'hd_touring',n:'Harley-Davidson Touring (Road Glide, Road King, Electra)',tank:22.7,auto:340},
-  {k:'hd_softail',n:'Harley-Davidson Softail / Cruiser',tank:18.9,auto:300},
-  {k:'touring',n:'Touring grande (Gold Wing, K 1600…)',tank:21.1,auto:370},
-  {k:'adv',n:'Adventure / Enduro stradale',tank:20,auto:380},
-  {k:'sporttour',n:'Crossover / Sport-touring',tank:19,auto:340},
-  {k:'naked',n:'Naked media 600–900',tank:15,auto:300},
-  {k:'sport',n:'Sportiva carenata',tank:17,auto:250},
-  {k:'scooter',n:'Scooter maxi 400–750',tank:14,auto:330},
-  {k:'custom',n:'Personalizzata',tank:15,auto:300}];
-const SET=Object.assign({crash:true,voice:false,traffic:true,emName:'',emPhone:'',moto:{type:'hd_sg',tank:22.7,auto:345,margin:100,price:1.85}},LS.get('motorotta_set',{}));
-if(!SET.moto||SET.moto.auto==null){SET.moto={type:'hd_sg',tank:22.7,auto:345,margin:100,price:(SET.moto&&SET.moto.price)||1.85};LS.set('motorotta_set',SET);}
+/* catalogo indicativo: [tipo, marca, modello, serbatoio (l, kg per metano), autonomia km, carburante] */
+const CATALOG=[
+ ['moto','Harley-Davidson','Street Glide',22.7,345,'benzina'],['moto','Harley-Davidson','Road Glide',22.7,345,'benzina'],
+ ['moto','Harley-Davidson','Road King',22.7,360,'benzina'],['moto','Harley-Davidson','Electra Glide / Ultra Limited',22.7,345,'benzina'],
+ ['moto','Harley-Davidson','Fat Boy / Heritage (Softail)',18.9,300,'benzina'],['moto','Harley-Davidson','Low Rider S/ST',18.9,280,'benzina'],
+ ['moto','Harley-Davidson','Sportster S / Nightster',11.8,190,'benzina'],['moto','Harley-Davidson','Pan America 1250',21.2,330,'benzina'],
+ ['moto','BMW','R 1250 GS / R 1300 GS',19,380,'benzina'],['moto','BMW','R 1250 RT',25,450,'benzina'],['moto','BMW','K 1600 GT/GTL',26.5,420,'benzina'],
+ ['moto','Ducati','Multistrada V4',22,330,'benzina'],['moto','Ducati','Monster',14,240,'benzina'],
+ ['moto','Honda','Gold Wing',21.1,370,'benzina'],['moto','Honda','Africa Twin',18.8,370,'benzina'],['moto','Honda','NC750X',14.1,400,'benzina'],['moto','Honda','SH 125/150',7.5,300,'benzina'],
+ ['moto','Yamaha','Tracer 9',18,320,'benzina'],['moto','Yamaha','MT-07',14,330,'benzina'],['moto','Yamaha','TMAX 560',15,320,'benzina'],
+ ['moto','Kawasaki','Z900',17,280,'benzina'],['moto','KTM','1290 Super Adventure',23,360,'benzina'],['moto','Triumph','Tiger 900',20,400,'benzina'],
+ ['moto','Moto Guzzi','V85 TT',23,420,'benzina'],['moto','Benelli','TRK 502',20,400,'benzina'],
+ ['moto','Piaggio','Beverly 300/400',12,330,'benzina'],['moto','Vespa','GTS 300',8.5,250,'benzina'],
+ ['auto','Fiat','Panda Hybrid',37,700,'benzina'],['auto','Fiat','500 Hybrid',35,680,'benzina'],['auto','Fiat','Tipo 1.6 Multijet',50,1050,'diesel'],
+ ['auto','Lancia','Ypsilon',40,750,'benzina'],['auto','Alfa Romeo','Tonale',55,800,'benzina'],['auto','Alfa Romeo','Giulia diesel',52,950,'diesel'],
+ ['auto','Dacia','Sandero',50,850,'benzina'],['auto','Dacia','Sandero ECO-G (GPL)',40,550,'gpl'],['auto','Dacia','Duster',50,850,'benzina'],['auto','Dacia','Duster ECO-G (GPL)',49,600,'gpl'],
+ ['auto','Toyota','Yaris Hybrid',36,850,'benzina'],['auto','Toyota','Yaris Cross Hybrid',36,800,'benzina'],['auto','Toyota','C-HR Hybrid',43,850,'benzina'],['auto','Toyota','RAV4 Hybrid',55,950,'benzina'],
+ ['auto','Jeep','Renegade',48,750,'benzina'],['auto','Jeep','Compass',55,800,'benzina'],
+ ['auto','Volkswagen','Golf 1.5 TSI',50,850,'benzina'],['auto','Volkswagen','Golf 2.0 TDI',50,1050,'diesel'],['auto','Volkswagen','T-Roc',50,800,'benzina'],['auto','Volkswagen','Tiguan 2.0 TDI',58,1000,'diesel'],
+ ['auto','Peugeot','208',44,800,'benzina'],['auto','Peugeot','2008',44,750,'benzina'],['auto','Peugeot','3008 diesel',53,1000,'diesel'],
+ ['auto','Renault','Clio',42,800,'benzina'],['auto','Renault','Captur',48,800,'benzina'],['auto','Citroën','C3',44,800,'benzina'],
+ ['auto','Ford','Puma',42,750,'benzina'],['auto','Opel','Corsa',44,800,'benzina'],['auto','Skoda','Octavia 2.0 TDI',45,1000,'diesel'],
+ ['auto','Audi','A3',50,850,'benzina'],['auto','Audi','Q5 diesel',70,1150,'diesel'],['auto','BMW','Serie 1',50,850,'benzina'],['auto','BMW','X1 diesel',51,1000,'diesel'],['auto','BMW','X3 diesel',65,1100,'diesel'],
+ ['auto','Mercedes-Benz','Classe A',43,750,'benzina'],['auto','Mercedes-Benz','GLC diesel',62,1100,'diesel'],
+ ['auto','Kia','Sportage',54,850,'benzina'],['auto','Hyundai','Tucson',54,850,'benzina'],['auto','MG','ZS',50,750,'benzina'],['auto','Volvo','XC60 diesel',71,1150,'diesel'],
+ ['altro','Fiat','Ducato camper',90,900,'diesel'],['altro','Volkswagen','Transporter / California',70,900,'diesel'],['altro','Ford','Transit',70,850,'diesel']];
+const SET=Object.assign({crash:true,voice:false,traffic:true,emName:'',emPhone:'',garage:null,activeVeh:null},LS.get('motorotta_set',{}));
+if(!Array.isArray(SET.garage)||!SET.garage.length){
+  const m=(SET.moto&&SET.moto.auto)?SET.moto:{tank:22.7,auto:345,margin:100,price:1.85};
+  SET.garage=[{id:'v1',kind:'moto',brand:'Harley-Davidson',model:'Street Glide',name:'Harley-Davidson Street Glide',fuel:'benzina',tank:m.tank,auto:m.auto,margin:m.margin||100,price:m.price||1.85}];
+  SET.activeVeh='v1';
+}
+function V(){return SET.garage.find(v=>v.id===SET.activeVeh)||SET.garage[0];}
+Object.defineProperty(SET,'moto',{get:V,enumerable:false,configurable:true});
+const isMoto=()=>V().kind==='moto';
 const saveSet=()=>LS.set('motorotta_set',SET);
+const KIND_IC={moto:'🏍️',auto:'🚗',altro:'🚐'};
+function vehSelUI(){
+  const sel=$('#vehSel');if(sel){sel.innerHTML=SET.garage.map(v=>`<option value="${v.id}">${KIND_IC[v.kind]||''} ${esc(v.name)}</option>`).join('');sel.value=V().id;}
+  document.body.classList.toggle('car',!isMoto());
+}
+function setActiveVeh(id){
+  SET.activeVeh=id;saveSet();vehSelUI();$('#fuelNow').value=Math.round(V().auto);
+  if(S.routes.length){renderAll(false);toast('Veicolo cambiato: ricalcola il percorso per adattarlo a '+V().name);}
+}
+let vfEdit=null;
+function renderGarage(){
+  const box=$('#garageList');if(!box)return;
+  box.innerHTML=SET.garage.map(v=>`<div class="sv"><div class="n" data-act="${v.id}"><b>${v.id===V().id?'✅ ':''}${KIND_IC[v.kind]||''} ${esc(v.name)}</b>
+    <div class="mut">${esc(v.fuel)} · ${v.tank} ${v.fuel==='metano'?'kg':'l'} · ${v.auto} km · margine ${v.margin} km · ${(v.tank/v.auto*100).toFixed(1)} ${v.fuel==='metano'?'kg':'l'}/100 km</div></div>
+    <button class="ib" data-ed="${v.id}">✏️</button></div>`).join('')+'<div class="mut" style="margin-top:4px">Tocca un veicolo per usarlo.</div>';
+  box.querySelectorAll('[data-act]').forEach(e=>e.onclick=()=>{setActiveVeh(e.dataset.act);renderGarage();consInfo();toast('Veicolo attivo: '+V().name);});
+  box.querySelectorAll('[data-ed]').forEach(e=>e.onclick=()=>openVehForm(SET.garage.find(v=>v.id===e.dataset.ed)));
+  consInfo();
+}
+function vfBrands(){const k=$('#vfKind').value;const b=[...new Set(CATALOG.filter(c=>c[0]===k).map(c=>c[1]))].sort();
+  $('#vfBrand').innerHTML='<option value="">— scegli —</option>'+b.map(x=>`<option>${esc(x)}</option>`).join('')+'<option value="_other">Altro / non in elenco</option>';vfModels();}
+function vfModels(){const k=$('#vfKind').value,b=$('#vfBrand').value;const m=CATALOG.filter(c=>c[0]===k&&c[1]===b);
+  $('#vfModel').innerHTML=(m.length?'<option value="">— scegli —</option>':'')+m.map((c,i)=>`<option value="${CATALOG.indexOf(c)}">${esc(c[2])}</option>`).join('')+'<option value="_other">Altro / inserisco io i dati</option>';}
+function vfPick(){const v=$('#vfModel').value;if(v===''||v==='_other')return;const c=CATALOG[+v];
+  $('#vfFuel').value=c[5];$('#vfTank').value=c[3];$('#vfAuto').value=c[4];$('#vfName').value=c[1]+' '+c[2];}
+function openVehForm(v){
+  vfEdit=v||null;$('#vehForm').style.display='block';$('#vfDel').style.display=v&&SET.garage.length>1?'block':'none';
+  $('#vfKind').value=v?v.kind:'moto';vfBrands();
+  if(v){if([...$('#vfBrand').options].some(o=>o.value===v.brand))$('#vfBrand').value=v.brand;else $('#vfBrand').value='_other';vfModels();
+    const ci=CATALOG.findIndex(c=>c[1]===v.brand&&c[2]===v.model);$('#vfModel').value=ci>=0?String(ci):'_other';}
+  $('#vfName').value=v?v.name:'';$('#vfFuel').value=v?v.fuel:'benzina';$('#vfTank').value=v?v.tank:'';$('#vfAuto').value=v?v.auto:'';
+  $('#vfMargin').value=v?v.margin:100;$('#vfPrice').value=v?v.price:1.85;$('#vfName').scrollIntoView({block:'center'});
+}
+function initGarageForm(){
+  $('#vehAdd').onclick=()=>openVehForm(null);
+  $('#vfKind').onchange=vfBrands;$('#vfBrand').onchange=vfModels;$('#vfModel').onchange=vfPick;
+  $('#vfCancel').onclick=()=>{$('#vehForm').style.display='none';};
+  $('#vfSave').onclick=()=>{
+    const num=id=>parseFloat(String($('#'+id).value).replace(',','.'));
+    const tank=num('vfTank'),auto=num('vfAuto'),margin=num('vfMargin')||100,price=num('vfPrice')||0;
+    if(!(tank>0&&auto>0)){toast('Inserisci serbatoio e autonomia');return;}
+    const mi=$('#vfModel').value,c=mi!==''&&mi!=='_other'?CATALOG[+mi]:null;
+    const name=$('#vfName').value.trim()||(c?c[1]+' '+c[2]:'Il mio veicolo');
+    const data={kind:$('#vfKind').value,brand:c?c[1]:($('#vfBrand').value&&$('#vfBrand').value!=='_other'?$('#vfBrand').value:''),model:c?c[2]:'',name,fuel:$('#vfFuel').value,tank,auto,margin,price};
+    if(vfEdit)Object.assign(vfEdit,data);else{const v={id:'v'+Date.now(),...data};SET.garage.push(v);SET.activeVeh=v.id;}
+    saveSet();$('#vehForm').style.display='none';vehSelUI();renderGarage();$('#fuelNow').value=Math.round(V().auto);if(S.routes.length)renderAll(false);toast('Veicolo salvato');
+  };
+  $('#vfDel').onclick=()=>{const b=$('#vfDel');if(!b.dataset.c){b.dataset.c=1;b.textContent='Tocca di nuovo per eliminare';return;}
+    SET.garage=SET.garage.filter(v=>v!==vfEdit);if(!SET.garage.find(v=>v.id===SET.activeVeh))SET.activeVeh=SET.garage[0].id;
+    saveSet();b.dataset.c='';b.textContent='🗑️ Elimina veicolo';$('#vehForm').style.display='none';vehSelUI();renderGarage();};
+}
 function initSettings(){
-  const ms=$('#motoType');ms.innerHTML=MOTO_TYPES.map(m=>`<option value="${m.k}">${m.n}</option>`).join('');
-  ms.value=SET.moto.type;$('#motoTank').value=SET.moto.tank;$('#motoAuto').value=SET.moto.auto;$('#motoMargin').value=SET.moto.margin;$('#motoPrice').value=SET.moto.price;
-  ms.onchange=()=>{const m=MOTO_TYPES.find(x=>x.k===ms.value);SET.moto.type=m.k;SET.moto.tank=m.tank;SET.moto.auto=m.auto;
-    $('#motoTank').value=m.tank;$('#motoAuto').value=m.auto;saveSet();consInfo();};
-  [['motoTank','tank'],['motoAuto','auto'],['motoMargin','margin'],['motoPrice','price']].forEach(([id,k])=>$('#'+id).oninput=e=>{const v=parseFloat(String(e.target.value).replace(',','.'));if(isFinite(v)&&v>0){SET.moto[k]=v;saveSet();consInfo();}});
+  renderGarage();
   consInfo();
   $('#setCrash').checked=SET.crash;$('#setVoice').checked=SET.voice;$('#trafOn').checked=SET.traffic;
   $('#emName').value=SET.emName;$('#emPhone').value=SET.emPhone;
@@ -1137,7 +1224,7 @@ function routeSummaryText(withTraffic){
   if(r&&ev&&ev.score!=null){
     const v=ev.pts.filter(p=>p.w);
     const minF=Math.round(Math.min(...v.map(p=>p.feel))),maxF=Math.round(Math.max(...v.map(p=>p.feel)));
-    t+=`Percorso ${r.label}: ${Math.round(r.len/1000)} chilometri, circa ${fmtDur(r.dur).replace('h','ore').replace('min','minuti')}. Punteggio di guida ${ev.score} su 100. Temperatura in sella da ${minF} a ${maxF} gradi. `;
+    t+=`Percorso ${r.label}: ${Math.round(r.len/1000)} chilometri, circa ${fmtDur(r.dur).replace('h','ore').replace('min','minuti')}. Punteggio di guida ${ev.score} su 100. ${isMoto()?'Temperatura in sella':'Temperatura esterna'} da ${minF} a ${maxF} gradi. `;
     if(v.some(p=>p.w.pr>=0.2))t+='Attenzione: pioggia prevista lungo il tragitto. ';
     if(v.some(p=>p.ice))t+='Attenzione: possibile ghiaccio. ';
     if(v.some(p=>p.w.wg>=45))t+='Raffiche di vento forti. ';
@@ -1244,7 +1331,7 @@ function stopRide(){
 function saveRide(t0,fixes){
   let f=fixes;if(f.length>6000){const st=Math.ceil(f.length/6000);f=f.filter((_,i)=>i%st===0);}
   const a=analyze(f);const id=String(t0);
-  const meta={id,t0,name:'Uscita del '+new Date(t0).toLocaleDateString('it-IT')+' '+fmtT(t0),dist:a.dist,dur:a.dur,maxL:a.maxL,maxR:a.maxR,maxV:a.maxV,apex:a.apex,curves:a.curves.length};
+  const meta={id,t0,vid:V().id,kind:V().kind,veh:V().name,name:'Uscita del '+new Date(t0).toLocaleDateString('it-IT')+' '+fmtT(t0),dist:a.dist,dur:a.dur,maxL:a.maxL,maxR:a.maxR,maxV:a.maxV,apex:a.apex,curves:a.curves.length};
   const old=LS.get('motorotta_rides',[]);const prev=old.find(x=>x.id===id);if(prev&&prev.fuelL)meta.fuelL=prev.fuelL;const list=old.filter(x=>x.id!==id);list.unshift(meta);
   LS.set('motorotta_ride_'+id,f);LS.set('motorotta_rides',list);return id;
 }
@@ -1407,7 +1494,7 @@ window.addEventListener('online',()=>{if(NAV.active&&NAV.recalcPending&&NAV.me){
 
 /* ================= carburante ================= */
 function effCons(){ // consumo: dai pieni registrati se disponibili, altrimenti serbatoio ÷ autonomia
-  const r=LS.get('motorotta_rides',[]).filter(x=>x.fuelL>0&&x.dist>5000);
+  const vid=V().id;const r=LS.get('motorotta_rides',[]).filter(x=>x.fuelL>0&&x.dist>5000&&(x.vid||'v1')===vid);
   const km=r.reduce((a,x)=>a+x.dist/1000,0),l=r.reduce((a,x)=>a+x.fuelL,0);
   return km>=20?{c:l/km*100,n:r.length,eff:true}:{c:SET.moto.tank/SET.moto.auto*100,n:0,eff:false};
 }
@@ -1421,7 +1508,8 @@ function fuelNowL(){return rangeNow()*effCons().c/100;}
 function pointAtKm(r,km){const d=km*1000;let j=r.cum.findIndex(x=>x>=d);if(j<0)j=r.coords.length-1;return r.coords[j];}
 function fuelPlan(r){
   const e=effCons(),c=e.c,tot=r.len/1000,M=SET.moto.margin||100,full=fullRange();
-  const st=r.fuelSt||[];const stops=[];let pos=0,range=rangeNow(),guard=0,warn=null;
+  const fu=V().fuel;const okF=x=>fu==='gpl'?x.lpg==='yes':fu==='metano'?x.cng==='yes':fu==='diesel'?x.diesel!=='no':x.o95!=='no';
+  const st=(r.fuelSt||[]).filter(okF);const stops=[];let pos=0,range=rangeNow(),guard=0,warn=null;
   const tAt=km=>S.dep+r.dur*1000*(km/tot)+stops.length*600000;
   const night=t=>{const h=new Date(t).getHours();return h>=20||h<7;};
   while(pos+range-M<tot&&guard++<20){
@@ -1466,7 +1554,7 @@ async function fetchFuel(){
     const j=await res.json();
     const all=(j.elements||[]).map(e=>{const t=e.tags||{};const lat=e.lat??(e.center&&e.center.lat),lon=e.lon??(e.center&&e.center.lon);if(lat==null)return null;
       const oh=t.opening_hours||'';const h24=oh==='24/7'||t.self_service==='yes'||t.automated==='yes';
-      return {p:[lat,lon],name:t.brand||t.name||t.operator||'Distributore',addr:[t['addr:street'],t['addr:city']].filter(Boolean).join(', '),oh,h24};}).filter(Boolean);
+      return {p:[lat,lon],name:t.brand||t.name||t.operator||'Distributore',addr:[t['addr:street'],t['addr:city']].filter(Boolean).join(', '),oh,h24,lpg:t['fuel:lpg'],cng:t['fuel:cng'],diesel:t['fuel:diesel'],o95:t['fuel:octane_95']};}).filter(Boolean);
     S.routes.forEach(r=>{
       const out=[];all.forEach(s=>{const pr=projKm(r,s.p);if(pr.d<=450&&!out.some(o=>hav(o.p,s.p)<150))out.push({...s,km:pr.km,off:Math.round(pr.d)});});
       r.fuelSt=out.sort((a,b)=>a.km-b.km);});
@@ -1528,7 +1616,7 @@ function renderRides(){
   let h='';
   if(live&&live.f&&live.f.length>5&&!RD.on)h+=`<div class="card"><b>Uscita non salvata trovata</b><div class="mut">Registrazione interrotta del ${fmtDT(live.t0)}</div><div class="grid2" style="margin-top:8px"><button id="recLive">Recupera</button><button id="dropLive">Elimina</button></div></div>`;
   if(!list.length)h+='<div class="card empty">Nessuna uscita registrata. Vai su <b>Guida</b> e premi Inizia.</div>';
-  else h+='<div class="card"><h3>Le tue uscite</h3>'+list.map(m=>`<div class="sv"><div class="n" data-id="${m.id}"><b>${esc(m.name)}</b><div class="mut">${km(m.dist)} · ${fmtDur(m.dur)} · piega max ${Math.round(Math.max(-m.maxL,m.maxR))}° · ${m.curves} curve · vel. max ${Math.round((m.maxV||0)*3.6)} km/h${m.fuelL?' · '+(m.fuelL/(m.dist/1000)*100).toFixed(1)+' l/100 km':''}${m.apex!=null?' · Apex '+m.apex:''}</div></div></div>`).join('')+'</div>';
+  else h+='<div class="card"><h3>Le tue uscite</h3>'+list.map(m=>`<div class="sv"><div class="n" data-id="${m.id}"><b>${esc(m.name)}</b><div class="mut">${m.kind&&m.kind!=='moto'?(KIND_IC[m.kind]+' '+esc(m.veh||'')+' · '):''}${km(m.dist)} · ${fmtDur(m.dur)} · ${m.kind&&m.kind!=='moto'?'':'piega max '+Math.round(Math.max(-m.maxL,m.maxR))+'° · '+m.curves+' curve'} · vel. max ${Math.round((m.maxV||0)*3.6)} km/h${m.fuelL?' · '+(m.fuelL/(m.dist/1000)*100).toFixed(1)+' l/100 km':''}${m.apex!=null?' · Apex '+m.apex:''}</div></div></div>`).join('')+'</div>';
   box.innerHTML=h;
   box.querySelectorAll('[data-id]').forEach(e=>e.onclick=()=>openRide(e.dataset.id));
   if($('#recLive')){$('#recLive').onclick=()=>{const id=saveRide(live.t0,live.f);try{localStorage.removeItem('motorotta_ride_live');}catch(e){}openRide(id);};
@@ -1537,13 +1625,13 @@ function renderRides(){
 function openRide(id){
   const meta=LS.get('motorotta_rides',[]).find(x=>x.id===id);const f=LS.get('motorotta_ride_'+id,null);
   if(!meta||!f){toast('Uscita non trovata');return;}
-  const a=analyze(f);const box=$('#ridesBox');
+  const a=analyze(f);const box=$('#ridesBox');const rm=(meta.kind||'moto')==='moto';
   const top=[...a.curves].sort((x,y)=>Math.abs(y.lean)-Math.abs(x.lean)).slice(0,8);
   box.innerHTML=`<button id="rBack" style="margin-bottom:10px">← Tutte le uscite</button>
   <div class="card"><h3>${esc(meta.name)}</h3><div id="rmap"></div>
    <div class="grid2">
-    <div class="kpi"><span class="mut">Piega max SX / DX</span><b>${Math.round(-a.maxL)}° / ${Math.round(a.maxR)}°</b></div>
-    <div class="kpi"><span class="mut">Apex Score</span><b style="color:${scCol(a.apex)}">${a.apex??'– (min. 3 curve)'}</b></div>
+    ${rm?`<div class="kpi"><span class="mut">Piega max SX / DX</span><b>${Math.round(-a.maxL)}° / ${Math.round(a.maxR)}°</b></div>
+    <div class="kpi"><span class="mut">Apex Score</span><b style="color:${scCol(a.apex)}">${a.apex??'– (min. 3 curve)'}</b></div>`:`<div class="kpi"><span class="mut">Veicolo</span><b>${KIND_IC[meta.kind]||''} ${esc(meta.veh||'')}</b></div><div class="kpi"><span class="mut">Forza G max</span><b>${a.maxG.toFixed(2)} g</b></div>`}
     <div class="kpi"><span class="mut">Distanza · tempo</span><b>${km(a.dist)} · ${fmtDur(a.dur)}</b></div>
     <div class="kpi"><span class="mut">Vel. max · media</span><b>${Math.round(a.maxV*3.6)} · ${Math.round(a.avgV*3.6)} km/h</b></div>
     <div class="kpi"><span class="mut">Forza G max</span><b>${a.maxG.toFixed(2)} g</b></div>
@@ -1562,11 +1650,11 @@ function openRide(id){
    <button id="fuelSave" style="width:100%">Salva e calcola consumo effettivo</button>
    <div class="note" style="margin-top:6px">Il consumo reale si calcola così: fai il pieno prima di partire e di nuovo all’arrivo, poi inserisci i litri del secondo pieno.</div></div>
   ${meta.nav?`<div class="card"><h3>🧭 Tappe</h3><div>✅ Raggiunte: ${meta.nav.reached.length?esc(meta.nav.reached.join(', ')):'nessuna'}</div><div style="margin-top:4px">⏭ Saltate: ${meta.nav.skipped.length?esc(meta.nav.skipped.join(', ')):'nessuna'}</div></div>`:''}
-  <div class="card"><h3>Angolo di piega nel tempo</h3><div class="mut">sopra lo zero destra, sotto sinistra (°)</div>
-   ${chart(f.map(x=>({d:x[0],l:x[4],v:x[3]*3.6})),[{f:p=>p.l,c:'#ff7a1a'}],'line',d=>Math.round(d/60)+' min')}
+  <div class="card">${rm?`<h3>Angolo di piega nel tempo</h3><div class="mut">sopra lo zero destra, sotto sinistra (°)</div>
+   ${chart(f.map(x=>({d:x[0],l:x[4],v:x[3]*3.6})),[{f:p=>p.l,c:'#ff7a1a'}],'line',d=>Math.round(d/60)+' min')}`:'<h3>Andamento</h3>'}
    <div class="mut">Velocità (km/h)</div>${chart(f.map(x=>({d:x[0],v:x[3]*3.6})),[{f:p=>p.v,c:'#5aa9ff'}],'line',d=>Math.round(d/60)+' min')}</div>
-  <div class="card"><h3>Curve più piegate</h3><ul class="al">${top.length?top.map((c,i)=>`<li data-c="${c.pk}" style="cursor:pointer">${c.lean<0?'↰':'↱'} <b>${Math.abs(Math.round(c.lean))}°</b> ${c.lean<0?'sinistra':'destra'} · ingresso ${Math.round(c.vin*3.6)} → minima ${Math.round(c.vmin*3.6)} → uscita ${Math.round(c.vout*3.6)} km/h · fluidità ${Math.round(c.smooth*100)}%</li>`).join(''):'<li>Nessuna curva sopra i 12°.</li>'}</ul>
-   <div class="note">Apex Score (0–100): 40% fluidità della piega, 30% uscita dalla curva (velocità in uscita rispetto all’ingresso), 30% piega media. È un indice indicativo di qualità di guida, non di velocità.</div></div>
+  ${rm?'':'<!--'}<div class="card"><h3>Curve più piegate</h3><ul class="al">${top.length?top.map((c,i)=>`<li data-c="${c.pk}" style="cursor:pointer">${c.lean<0?'↰':'↱'} <b>${Math.abs(Math.round(c.lean))}°</b> ${c.lean<0?'sinistra':'destra'} · ingresso ${Math.round(c.vin*3.6)} → minima ${Math.round(c.vmin*3.6)} → uscita ${Math.round(c.vout*3.6)} km/h · fluidità ${Math.round(c.smooth*100)}%</li>`).join(''):'<li>Nessuna curva sopra i 12°.</li>'}</ul>
+   <div class="note">Apex Score (0–100): 40% fluidità della piega, 30% uscita dalla curva (velocità in uscita rispetto all’ingresso), 30% piega media. È un indice indicativo di qualità di guida, non di velocità.</div></div>${rm?'':'-->'}
   <div class="card"><h3>Condividi</h3>
    <label class="file" style="width:100%;text-align:center;margin-bottom:8px">📷 Aggiungi una foto al poster<input type="file" id="posterPhoto" accept="image/*"></label>
    <div class="grid2"><button id="rPoster">🖼️ Crea poster</button><button id="rGpx">⬇️ Esporta GPX</button></div>
@@ -1701,6 +1789,7 @@ function renderTraffic(){
 }
 
 /* ================= avvio ================= */
+initGarageForm();vehSelUI();$('#vehSel').onchange=e=>setActiveVeh(e.target.value);
 renderStops();renderSaved();initSettings();
 $('#routeMode').value=LS.get('motorotta_mode','curvy');
 $('#fuelNow').value=Math.round(SET.moto.auto);$('#fuelNow').addEventListener('change',()=>{if(S.routes.length)renderAll(false);});
