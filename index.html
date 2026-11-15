@@ -161,6 +161,7 @@ select{width:100%;background:var(--inp);color:var(--tx);border:1px solid var(--l
       <label class="fld" style="display:block;margin-top:0">Veicolo<select id="vehSel"></select></label>
       <label class="fld" style="display:block;margin-top:0">Tipo di percorso<select id="routeMode">
         <option value="fast">⚡ Più veloce (anche autostrade)</option>
+        <option value="motorway">🛣️ Solo autostrada (il più possibile)</option>
         <option value="mixed">⚖️ Misto (autostrade solo dove convengono)</option>
         <option value="nohw">🛣️ Senza autostrade</option>
         <option value="curvy">🌀 Con più curve (panoramico)</option>
@@ -168,12 +169,14 @@ select{width:100%;background:var(--inp);color:var(--tx);border:1px solid var(--l
       </select></label>
       <label><input type="checkbox" id="optToll"> Evita pedaggi</label>
       <label><input type="checkbox" id="optAuto"> Parti sempre dalla mia posizione</label>
+      <label><input type="checkbox" id="optLoop"> 🔁 Giro ad anello: rientro al punto di partenza</label>
     </div>
     <label class="fld">⛽ Autonomia residua ora (km, come sul cruscotto)<input type="number" id="fuelNow" min="0" max="900" step="5" inputmode="numeric"></label>
     <label class="fld">Velocità media per tracce GPX (GPS Exchange Format), km/h<input type="number" id="gpxSpd" value="55" min="20" max="130"></label>
     <button id="go" class="primary">Calcola percorso e meteo</button>
   </section>
 
+  <section class="card" id="selCard" style="display:none"></section>
   <nav class="tabs">
     <button data-tab="routes" class="on">Percorsi</button>
     <button data-tab="meteo">Meteo</button>
@@ -189,7 +192,7 @@ select{width:100%;background:var(--inp);color:var(--tx);border:1px solid var(--l
 
   <div class="foot">
     Mappe © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · Percorsi: Valhalla (profilo moto, server FOSSGIS) e OSRM (Open Source Routing Machine) · Ricerca luoghi: Photon · Meteo: <a href="https://open-meteo.com/">Open-Meteo</a> (modelli ECMWF/ICON/GFS).<br>
-    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">Versione 15 nov 2026 · 21:30 (guida vocale + viaggio salvato)</b>
+    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">Versione 15 nov 2026 · 22:30 (soste rosse/azzurre, anello, passi, strada bloccata, 4 contatti)</b>
   </div>
 </main>
 </div>
@@ -202,13 +205,14 @@ select{width:100%;background:var(--inp);color:var(--tx);border:1px solid var(--l
     <button id="navStartBtn" class="primary">▶︎ Naviga sul percorso pianificato</button>
     <div class="note" style="margin-top:6px">GoRide guida tappa per tappa con annunci vocali, segnala tappe saltate e uscite dal percorso, e registra anche piega e dati di marcia.</div></div>
   <div class="card" id="navCard" style="display:none">
-    <div id="nmapWrap"><div id="nmap"></div><div id="manBanner" class="manb"><div class="arr" id="manArr">↑</div><div><div class="d" id="manDist"></div><div class="t" id="manTxt"></div></div></div><div id="alertBanner" class="alb"></div><div id="recenter" class="recenter">⟲ torna alla guida</div></div>
+    <div id="nmapWrap"><div id="nmap"></div><div id="manBanner" class="manb"><div class="arr" id="manArr">↑</div><div><div class="d" id="manDist"></div><div class="t" id="manTxt"></div></div></div><div id="alertBanner" class="alb"></div><div id="recenter" class="recenter">⟲ torna alla guida</div><div id="blockAsk" class="alb" style="border-color:#ff7a1a;top:96px;bottom:auto"></div></div>
     <div id="navStatus" class="navst">✅ Sul percorso</div>
     <div class="grid2">
       <div class="kpi"><span class="mut">Prossima tappa</span><b id="navNext">–</b><span class="mut" id="navNextInfo"></span></div>
       <div class="kpi"><span class="mut">Arrivo finale</span><b id="navTot">–</b><span class="mut" id="navTotInfo"></span></div>
     </div>
     <div class="grid2" style="margin-top:8px"><a id="navGm" class="navbtn" href="#" target="_blank" rel="noopener">🧭 Svolte su Google (questo tratto)</a><button id="navSkip">⏭ Salta tappa</button></div>
+    <button id="navBlock" style="width:100%;margin-top:8px;background:#000;color:#fff;border:2px solid #e60000;font-weight:700">⛔ Strada bloccata: trova alternativa</button>
     <button id="navStop" style="width:100%;margin-top:8px">🏁 Chiudi viaggio</button>
   </div>
   <div class="card">
@@ -273,9 +277,10 @@ select{width:100%;background:var(--inp);color:var(--tx);border:1px solid var(--l
     </div>
     <div class="note" id="consInfo" style="margin-top:8px"></div>
   </div>
-  <div class="card"><h3>Contatto di emergenza</h3>
-    <label class="fld">Nome<input type="text" id="emName" placeholder="es. Mario"></label>
-    <label class="fld">Telefono<input type="text" id="emPhone" inputmode="tel" placeholder="+39 333 1234567"></label>
+  <div class="card"><h3>Contatti di emergenza (fino a 4)</h3>
+    <div id="emList"></div>
+    <div class="note">In caso di allarme il messaggio parte verso tutti i contatti insieme, con il link alla posizione del veicolo al momento dell’allarme.</div>
+    <button id="sosPos" style="width:100%;margin-top:8px">📍 Invia ora la mia posizione ai contatti</button>
   </div>
   <div class="card"><h3>Sicurezza e audio</h3>
     <div class="sw"><span>Rilevamento cadute durante la registrazione</span><input type="checkbox" id="setCrash"></div>
@@ -283,6 +288,7 @@ select{width:100%;background:var(--inp);color:var(--tx);border:1px solid var(--l
     <div class="sw"><span>Tema scuro (predefinito: chiaro)</span><input type="checkbox" id="setDark"></div>
     <div class="sw"><span>Guida vocale svolta per svolta</span><input type="checkbox" id="setTbt"></div>
     <button id="testSos" style="width:100%;margin-top:8px">Prova l’allarme caduta</button>
+    <div class="note" style="margin-top:8px">🔊 Annunci vocali e musica: GoRide usa la voce dell’iPhone. Di solito iOS abbassa o mette in pausa la musica (Spotify, radio, Apple Music) durante l’annuncio; il comportamento esatto dipende da iOS e dall’app musicale e non è controllabile da una web app. Con l’interfono Bluetooth gli annunci arrivano nel casco.</div>
     <div class="note" style="margin-top:8px">In caso di urto violento seguito da arresto, GoRide &amp; Weather suona un allarme e mostra un conto alla rovescia di 30 secondi. Se non tocchi “Sto bene”, prepara un SMS con la tua posizione per il contatto di emergenza: l’invio va confermato con un tocco (una web app non può inviare SMS da sola).</div>
   </div>
   <div class="card"><h3>Dati</h3><div class="note" id="storeInfo"></div><button id="clearAll" style="width:100%;margin-top:8px">Elimina tutti i dati salvati</button></div>
@@ -387,8 +393,11 @@ async function geocode(q,limit=6){
 }
 function attachAC(inp,sug,set,idx){
   let t;
-  const myPos=()=>{const d=document.createElement('div');d.innerHTML='📍 <b>La mia posizione</b>';
-    d.addEventListener('pointerdown',e=>{e.preventDefault();sug.innerHTML='';inp.blur();geoLocate(idx);});return d;};
+  const myPos=()=>{const fr=document.createDocumentFragment();const d=document.createElement('div');d.innerHTML='📍 <b>La mia posizione</b>';
+    d.addEventListener('pointerdown',e=>{e.preventDefault();sug.innerHTML='';inp.blur();geoLocate(idx);});fr.appendChild(d);
+    Object.values(sels()).slice(0,6).forEach(v=>{const x=document.createElement('div');x.innerHTML=`📌 ${catOf(v.cat).ic} ${esc(v.name)}`;
+      x.addEventListener('pointerdown',e=>{e.preventDefault();inp.value=v.name;sug.innerHTML='';set({lat:v.p[0],lon:v.p[1],name:v.name},v.name);});fr.appendChild(x);});
+    return fr;};
   inp.addEventListener('focus',()=>{if(!inp.value.trim()||(S.stops[idx]&&S.stops[idx].p&&S.stops[idx].p.name==='La mia posizione')){sug.innerHTML='';sug.appendChild(myPos());}});
   inp.addEventListener('input',()=>{
     set(null,inp.value);clearTimeout(t);
@@ -457,20 +466,21 @@ function vTrip(t){const coords=[];const names=new Set();const man=[];const L2=(t
       if([1,2,3].includes(m.type)&&k>0)return;if([4,5,6].includes(m.type)&&k<L2-1)return;
       man.push({i:base+(m.begin_shape_index||0),type:m.type,txt:m.instruction||'',alert:m.verbal_transition_alert_instruction||'',pre:m.verbal_pre_transition_instruction||m.instruction||'',street:(m.street_names||[])[0]||'',exit:m.roundabout_exit_count||0});});});
   return {coords,dist:(t.summary.length||0)*1000,dur:t.summary.time||0,names:[...names],man};}
-async function valhalla(pts,alts,pref){
+async function valhalla(pts,alts,pref,excl){
   const q={locations:pts.map((p,i)=>({lat:+p[0].toFixed(6),lon:+p[1].toFixed(6),type:(i===0||i===pts.length-1)?'break':'through'})),
     costing:isMoto()?'motorcycle':'auto',costing_options:{[isMoto()?'motorcycle':'auto']:Object.assign({use_highways:pref.hw,use_tolls:pref.toll?0:0.5,use_ferry:0.3},isMoto()?{use_trails:0}:{})},
     units:'kilometers',language:'it-IT',directions_options:{units:'kilometers',language:'it-IT'}};
   if(alts&&pts.length===2)q.alternates=2;
+  if(excl&&excl.length)q.exclude_locations=excl.map(p=>({lat:+p[0].toFixed(6),lon:+p[1].toFixed(6)}));
   const ctl=new AbortController();const tm=setTimeout(()=>ctl.abort(),25000);
   try{const r=await fetch('https://valhalla1.openstreetmap.de/route?json='+encodeURIComponent(JSON.stringify(q)),{signal:ctl.signal});
     const j=await r.json();if(!j.trip)throw new Error(j.error||'percorso non trovato');
     return [vTrip(j.trip),...(j.alternates||[]).map(a=>vTrip(a.trip))];}
   finally{clearTimeout(tm);}
 }
-async function routeSafe(pts,alts,excl,pref){
+async function routeSafe(pts,alts,excl,pref,avoid){
   pref=pref||ROUTE_PREF;
-  try{return {rs:await valhalla(pts,alts,pref),ex:true,engine:'valhalla'};}catch(e){console.warn('Valhalla non disponibile',e);}
+  try{return {rs:await valhalla(pts,alts,pref,avoid),ex:true,engine:'valhalla'};}catch(e){console.warn('Valhalla non disponibile',e);}
   if(excl){try{return {rs:await osrm(pts,alts,excl),ex:true,engine:'osrm'};}catch(e){console.warn('exclude non supportato',e);}}
   return {rs:await osrm(pts,alts,null),ex:!excl,engine:'osrm'};
 }
@@ -594,6 +604,8 @@ async function calc(){
     if(S.mode!=='gpx'||!S.routes.length||!S.routes[0].gpx){
       S.mode='route';
       status('Cerco i luoghi…');await resolveStops();
+      if($('#optLoop').checked){const f=S.stops[0],l=S.stops[S.stops.length-1];
+        if(f.p&&(!l.p||hav([f.p.lat,f.p.lon],[l.p.lat,l.p.lon])>200)){if(l.p)S.stops.push({p:{...f.p,name:'Rientro: '+(f.p.name||'partenza').split(',')[0]},text:''});else l.p={...f.p,name:'Rientro: '+(f.p.name||'partenza').split(',')[0]};}}
       const pts=S.stops.filter(s=>s.p).map(s=>[s.p.lat,s.p.lon]);
       if(pts.length<2){toast('Inserisci almeno partenza e destinazione');return;}
       renderStops();
@@ -615,7 +627,7 @@ async function calc(){
         if(changed){const cr=joinLegs(legs);routes.unshift({...cr,label:m.curvyLabel,variant:true});}
         else toast('Nessuna strada più curvosa trovata entro la deviazione ammessa');
       }
-      if(mode!=='fast'){
+      if(mode!=='fast'&&mode!=='motorway'){
         try{await sleep(250);const f=(await routeSafe(pts,false,$('#optToll').checked?'toll':null,{hw:1,toll:$('#optToll').checked})).rs[0];routes.push({...f,label:'⚡ Più veloce (anche autostrade)'});}catch(e){}
       }
       routes=routes.filter((r,i,a)=>a.findIndex(o=>Math.abs(o.dist-r.dist)/r.dist<0.015)===i);
@@ -633,7 +645,8 @@ async function calc(){
 
 /* ================= tipi di percorso ================= */
 const MODES={
-  fast:{ex:false,hw:1,label:'⚡ Più veloce'},
+  fast:{ex:false,hw:0.8,label:'⚡ Più veloce'},
+  motorway:{ex:false,hw:1,label:'🛣️ Solo autostrada'},
   mixed:{ex:false,hw:0.5,label:'⚖️ Misto'},
   nohw:{ex:true,hw:0,label:'🛣️ Senza autostrade'},
   curvy:{ex:true,hw:0,label:'Senza autostrade (più diretto)',curvy:true,curvyLabel:'🌀 Più curve',offs:[0.2,-0.2],detour:1.6},
@@ -765,7 +778,7 @@ function bindProposal(){
 }
 
 /* ================= rendering ================= */
-function renderAll(fit){
+function renderAll(fit){setTimeout(()=>{drawSelLayer();renderSelCard();},0);
   S.ev=S.routes.map(r=>evalRoute(r,S.dep));
   const curvMax=Math.max(...S.routes.map(r=>r.curv));
   const nMax=S.routes.filter(r=>r.curv>=curvMax-1).length;
@@ -791,7 +804,7 @@ function drawMap(fit){
   });
   try{const mk=(x,col,title)=>L.marker(x.p,{icon:L.divIcon({className:'',html:`<div style="width:24px;height:24px;border-radius:50%;background:${col};border:2px solid #111;display:flex;align-items:center;justify-content:center;font-size:13px">⛽</div>`,iconSize:[24,24],iconAnchor:[12,12]})})
       .bindPopup(`<b>${title}</b><br>${esc(x.synthetic?'Nessun distributore trovato':x.name)}<br>km ${Math.round(x.km)} · ~${fmtT(x.t)}<br>autonomia all’arrivo ${Math.round(x.rangeArr)} km<br><a href="${x.synthetic?gasUrl(x.p):navToUrl(x.p)}" target="_blank" rel="noopener">${x.synthetic?'Cerca distributori':'Portami qui'}</a>`).addTo(layer);
-    fuelPlan(r).stops.forEach(x=>{mk(x,'#3ecf6e','Sosta '+x.n);if(x.backup)mk(x.backup,'#5aa9ff','Emergenza sosta '+x.n);});}catch(e){console.warn(e);}
+    fuelPlan(r).stops.forEach(x=>{mk(x,'#e60000',x.optional?'Distributore consigliato':'Sosta rifornimento '+x.n);if(x.backup)mk(x.backup,'#29b6ff','Distributore di riserva');});}catch(e){console.warn(e);}
   const c=r.coords;
   L.circleMarker(c[0],{radius:7,color:'#fff',fillColor:'#3ecf6e',fillOpacity:1,weight:2}).addTo(layer);
   L.circleMarker(c[c.length-1],{radius:7,color:'#fff',fillColor:'#eb5757',fillOpacity:1,weight:2}).addTo(layer);
@@ -825,19 +838,19 @@ function renderRoutes(){
     ${Math.abs(b.dep-S.dep)>900000&&b.score>(cur||0)?`<button id="useBest" style="width:100%;margin-top:8px">Parti alle ${fmtT(b.dep)} (meteo migliore)</button>`:'<div class="mut" style="margin-top:6px">✅ L’orario scelto è già il migliore.</div>'}</div>`;}
   const fp=fuelPlan(r);
   const stLine=(x,kind)=>`<div style="display:flex;gap:8px;align-items:flex-start;padding:8px 0;${kind==='p'?'border-top:1px solid var(--line)':''}">
-     <div style="width:26px;height:26px;border-radius:50%;background:${kind==='p'?'#3ecf6e':'#5aa9ff'};display:flex;align-items:center;justify-content:center;flex:none;font-size:14px">⛽</div>
-     <div style="flex:1"><b>${kind==='p'?'Sosta '+x.n:'Emergenza'}${x.synthetic?'':': '+esc(x.name)}</b>${x.synthetic?' <span style="color:var(--r)">– nessun distributore trovato qui</span>':''}
+     <div style="width:26px;height:26px;border-radius:50%;background:${kind==='p'?'#e60000':'#29b6ff'};display:flex;align-items:center;justify-content:center;flex:none;font-size:14px">⛽</div>
+     <div style="flex:1"><b>${kind==='p'?(x.optional?'Distributore consigliato':'Sosta '+x.n):'Riserva'}${x.synthetic?'':': '+esc(x.name)}</b>${x.synthetic?' <span style="color:var(--r)">– nessun distributore trovato qui</span>':''}
      <div class="mut">km ${Math.round(x.km)} · ~${fmtT(x.t)} · autonomia all’arrivo <b style="color:${kind==='p'&&x.rangeArr<fp.M?'var(--r)':'inherit'}">${Math.round(x.rangeArr)} km</b>${x.off>100?' · '+x.off+' m dal percorso':''}${x.h24?' · 24h/self':x.oh?' · orari: '+esc(x.oh):''}</div>
      <a href="${x.synthetic?gasUrl(x.p):navToUrl(x.p)}" target="_blank" rel="noopener" style="color:var(--acc);font-size:13px">${x.synthetic?'cerca distributori in zona':'portami qui'}</a></div></div>`;
   h+=`<div class="card"><h3>⛽ Carburante e soste · ${KIND_IC[V().kind]||''} ${esc(V().name)} (${esc(V().fuel)})</h3>${['gpl','metano'].includes(V().fuel)?'<div class="note" style="color:var(--y)">Distributori '+(V().fuel==='gpl'?'GPL':'metano')+': i dati della mappa sono meno completi, verifica prima di partire.</div>':''}<div class="grid2">
     <div class="kpi"><span class="mut">Consumo previsto</span><b>${fp.need.toFixed(1)} litri</b><span class="mut">${fp.c.toFixed(1)} l/100 km ${fp.eff?'(dai tuoi pieni)':''}</span></div>
     <div class="kpi"><span class="mut">Costo stimato</span><b>€ ${fp.cost.toFixed(2)}</b><span class="mut">a ${(+SET.moto.price||0).toFixed(2)} €/${V().fuel==='metano'?'kg':'l'}</span></div>
     <div class="kpi"><span class="mut">Autonomia ora</span><b>${Math.round(fp.range)} km</b><span class="mut">pieno: ${Math.round(fp.full)} km</span></div>
-    <div class="kpi"><span class="mut">Soste</span><b>${fp.stops.length}</b><span class="mut">${fp.stops.length?'+'+fp.stops.length*10+' min circa':'non servono'} · arrivo con ${Math.round(fp.endRange)} km</span></div></div>
+    <div class="kpi"><span class="mut">Soste</span><b>${fp.req}</b><span class="mut">${fp.req?'+'+fp.req*10+' min circa':'non necessarie'} · arrivo con ${Math.round(fp.endRange)} km</span></div></div>
     ${S.fuelState==='loading'?'<div class="mut" style="margin-top:8px">⏳ Cerco i distributori lungo il percorso…</div>':''}
     ${fp.warn?`<div class="note" style="color:var(--y);margin-top:8px">⚠️ ${fp.warn}</div>`:''}
     ${fp.stops.map(x=>stLine(x,'p')+(x.backup?stLine(x.backup,'b'):'<div class="mut" style="padding-left:34px">Nessun distributore di emergenza vicino</div>')).join('')}
-    <div class="note" style="margin-top:6px">🟢 Sosta principale: l’ultimo distributore sul percorso prima che l’autonomia scenda sotto <b>${fp.M} km</b>. 🔵 Emergenza: il distributore successivo (o precedente) da usare se quello principale è chiuso. Di notte preferisco distributori 24h/self quando ci sono. Distributori da OpenStreetMap: orari e servizio vanno sempre verificati.</div></div>`;
+    <div class="note" style="margin-top:6px">🔴 Distributore designato per la sosta: scelto in sicurezza, anche prima del limite, solo se dopo di lui c’è un altro distributore raggiungibile restando sopra <b>${fp.M} km</b> di autonomia; preferisco aree di servizio, aperti 24h/self e marchi principali. 🔵 Riserva: il distributore successivo, sempre segnalato sul percorso. Distributori da OpenStreetMap: orari e servizio vanno sempre verificati.</div></div>`;
   h+=`<div class="card"><h3>Azioni</h3><button id="bNav" class="primary" style="margin:0 0 10px">▶︎ Naviga con GoRide</button><div class="links">
     <a href="${gmapsUrl(r)}" target="_blank" rel="noopener">🧭 Apri tutto il percorso in Google Maps</a></div>
     <div class="grid2"><button id="bGpx">⬇️ Esporta GPX</button><button id="bShare">🔗 Condividi</button></div>
@@ -998,7 +1011,7 @@ function defaultName(){
 }
 function payload(){
   return {s:S.stops.filter(x=>x.p).map(x=>[+x.p.lat.toFixed(5),+x.p.lon.toFixed(5),x.p.name]),
-    o:{m:$('#routeMode').value,t:$('#optToll').checked?1:0},sel:S.sel,ra:ratesForRoute()};
+    o:{m:$('#routeMode').value,t:$('#optToll').checked?1:0,l:$('#optLoop').checked?1:0},sel:S.sel,ra:ratesForRoute()};
 }
 function applyPayload(p){
   S.mode='route';S.routes=[];
@@ -1144,12 +1157,13 @@ const CATALOG=[
  ['auto','Mercedes-Benz','Classe A',43,750,'benzina'],['auto','Mercedes-Benz','GLC diesel',62,1100,'diesel'],
  ['auto','Kia','Sportage',54,850,'benzina'],['auto','Hyundai','Tucson',54,850,'benzina'],['auto','MG','ZS',50,750,'benzina'],['auto','Volvo','XC60 diesel',71,1150,'diesel'],
  ['altro','Fiat','Ducato camper',90,900,'diesel'],['altro','Volkswagen','Transporter / California',70,900,'diesel'],['altro','Ford','Transit',70,850,'diesel']];
-const SET=Object.assign({crash:true,voice:false,traffic:true,emName:'',emPhone:'',garage:null,activeVeh:null},LS.get('motorotta_set',{}));
+const SET=Object.assign({crash:true,voice:false,traffic:true,emName:'',emPhone:'',contacts:null,garage:null,activeVeh:null},LS.get('motorotta_set',{}));
 if(!Array.isArray(SET.garage)||!SET.garage.length){
   const m=(SET.moto&&SET.moto.auto)?SET.moto:{tank:22.7,auto:345,margin:100,price:1.85};
   SET.garage=[{id:'v1',kind:'moto',brand:'Harley-Davidson',model:'Street Glide',name:'Harley-Davidson Street Glide',fuel:'benzina',tank:m.tank,auto:m.auto,margin:m.margin||100,price:m.price||1.85}];
   SET.activeVeh='v1';
 }
+if(!Array.isArray(SET.contacts)){SET.contacts=[{n:SET.emName||'',p:SET.emPhone||''},{n:'',p:''},{n:'',p:''},{n:'',p:''}];}
 function V(){return SET.garage.find(v=>v.id===SET.activeVeh)||SET.garage[0];}
 Object.defineProperty(SET,'moto',{get:V,enumerable:false,configurable:true});
 const isMoto=()=>V().kind==='moto';
@@ -1211,12 +1225,14 @@ function initSettings(){
   $('#setDark').checked=!!SET.dark;$('#setDark').onchange=e=>{SET.dark=e.target.checked;saveSet();document.body.classList.toggle('dark',SET.dark);};
   $('#setTbt').checked=SET.tbt!==false;$('#setTbt').onchange=e=>{SET.tbt=e.target.checked;saveSet();};
   $('#setCrash').checked=SET.crash;$('#setVoice').checked=SET.voice;$('#trafOn').checked=SET.traffic;
-  $('#emName').value=SET.emName;$('#emPhone').value=SET.emPhone;
+  $('#emList').innerHTML=SET.contacts.map((c,i)=>`<div class="grid2" style="margin-bottom:6px"><input type="text" data-cn="${i}" placeholder="Nome ${i+1}" value="${esc(c.n)}"><input type="text" data-cp="${i}" inputmode="tel" placeholder="+39 …" value="${esc(c.p)}"></div>`).join('');
+  document.querySelectorAll('[data-cn]').forEach(e=>e.oninput=()=>{SET.contacts[+e.dataset.cn].n=e.value;saveSet();});
+  document.querySelectorAll('[data-cp]').forEach(e=>e.oninput=()=>{SET.contacts[+e.dataset.cp].p=e.value;saveSet();});
+  $('#sosPos').onclick=()=>{const go=p=>{location.href=smsUrl(`📍 Mia posizione: https://maps.google.com/?q=${p[0].toFixed(5)},${p[1].toFixed(5)} – inviata da GoRide & Weather`);};
+    if(RD.lastFix)go(RD.lastFix.p);else if(navigator.geolocation)navigator.geolocation.getCurrentPosition(x=>go([x.coords.latitude,x.coords.longitude]),()=>locHelp({code:1}),{timeout:10000});};
   $('#setCrash').onchange=e=>{SET.crash=e.target.checked;saveSet();};
   $('#setVoice').onchange=e=>{SET.voice=e.target.checked;saveSet();};
   $('#trafOn').onchange=e=>{SET.traffic=e.target.checked;saveSet();renderTraffic();};
-  $('#emName').oninput=e=>{SET.emName=e.target.value;saveSet();};
-  $('#emPhone').oninput=e=>{SET.emPhone=e.target.value;saveSet();};
   $('#testSos').onclick=()=>{unlockAudio();sosStart(true);};
   $('#clearAll').onclick=()=>{
     if(!$('#clearAll').dataset.c){$('#clearAll').dataset.c=1;$('#clearAll').textContent='Tocca di nuovo per confermare';return;}
@@ -1458,6 +1474,7 @@ function navDraw(){
       if(x.backup)L.circleMarker(x.backup.p,{radius:8,color:'#111',weight:2,fillColor:'#29b6ff',fillOpacity:1}).bindTooltip('⛽ riserva '+x.backup.name).addTo(NAV.layers);});}catch(e){}
   NAV.stops.forEach((s,k)=>{const col=s.state==='done'?'#3ecf6e':s.state==='skipped'?'#777':k===NAV.next?'#ff7a1a':'#fff';
     L.circleMarker([s.p.lat,s.p.lon],{radius:k===NAV.next?9:7,color:'#111',weight:2,fillColor:col,fillOpacity:1}).bindTooltip(s.name).addTo(NAV.layers);});
+  Object.values(sels()).forEach(v=>L.marker(v.p,{icon:L.divIcon({className:'',html:`<div style="background:#fff;border:2px solid #f26b00;border-radius:12px;padding:1px 4px;font-size:15px">📌${catOf(v.cat).ic}</div>`,iconSize:[44,24],iconAnchor:[22,12]})}).addTo(NAV.layers));
   if(NAV.me)L.marker(NAV.me,{icon:L.divIcon({className:'',html:'<div style="width:26px;height:26px;border-radius:50%;background:#ff7a1a;border:3px solid #fff;box-shadow:0 0 6px rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px">▲</div>',iconSize:[26,26],iconAnchor:[13,13]})}).addTo(NAV.layers);
 }
 function navStatus(t,col){const e=$('#navStatus');e.innerHTML=t;e.style.background=col||'#16351f';}
@@ -1522,14 +1539,16 @@ function navFuel(){
   const ar=(RD.rangeStart??rangeNow())-RD.dist/1000;
   if(ar<(SET.moto.margin||100)&&!NAV.said.lowfuel){NAV.said.lowfuel=1;speak(`Attenzione: autonomia stimata ${Math.round(ar)} chilometri, sotto il margine di sicurezza. Fai rifornimento al primo distributore.`);}
 }
-function navAlerts(along){navFuel(); // avvisi meteo e chiusure in arrivo (3–6 km)
+function navSel(){if(!NAV.me)return;Object.entries(sels()).forEach(([k,v])=>{const d=hav(NAV.me,v.p);if(d<2500&&d>300&&!NAV.said['sel'+k]){NAV.said['sel'+k]=1;
+  const cd=v.oh?closedDays(v.oh):'';showAlert(`📌 ${catOf(v.cat).ic} <b>${esc(v.name)}</b> a ${mSay(d)}${cd?' · chiuso '+cd:''}`,`Luogo selezionato vicino: ${v.name}, a ${mSay(d)}.`);}});}
+function navAlerts(along){navFuel();navSel(); // avvisi meteo e chiusure in arrivo (3–6 km)
   const r=S.routes[S.sel],ev=S.ev[S.sel];if(!ev)return;
   ev.pts.forEach(p=>{if(!p.w)return;const ahead=p.d-along;if(ahead<2500||ahead>6000)return;
     const k=Math.round(p.d/1000);let t=null;
     if(p.ice)t='possibile ghiaccio';else if([95,96,99].includes(p.w.code))t='temporale';else if(p.w.sd>=0.01)t='neve al suolo nella zona';
     else if(p.w.pr>=0.5)t='pioggia';else if(p.w.wg>=50)t='raffiche di vento forti';else if(p.w.vis!=null&&p.w.vis<1000)t='visibilità ridotta';
     if(t&&(NAV.said['w'+t]==null||along-NAV.said['w'+t]>15000)){NAV.said['w'+t]=along;showAlert(`⚠️ Tra ${kmSay(ahead)}: <b>${t}</b>`,`Attenzione: tra circa ${kmSay(ahead)} ${t}.`);}});
-  (S.routes[S.sel]&&S.routes[S.sel].closures||[]).filter(c=>c.active).forEach(c=>{const d=hav(NAV.me||[0,0],c.p);if(d<5000&&!NAV.said['cl'+c.name]){NAV.said['cl'+c.name]=1;showAlert('⛔ '+closureTxt(c),'Attenzione: possibile chiusura stradale più avanti, '+(c.name||'')+'.');}});
+  (S.routes[S.sel]&&S.routes[S.sel].closures||[]).filter(c=>c.active).forEach(c=>{const d=hav(NAV.me||[0,0],c.p);if(d<5000&&!NAV.said['cl'+c.name]){NAV.said['cl'+c.name]=1;navBlock('closure',c.p);}});
 }
 function navOnFix(pt,acc){
   if(!NAV.active||acc>80)return;
@@ -1559,6 +1578,45 @@ function navOnFix(pt,acc){
   if(NAV.offCount===0)navAlerts(pr.along);
   navUI(pr);
 }
+/* ===== strada bloccata: alternativa verso la tappa successiva, da accettare ===== */
+function idxAhead(m){const base=NAV.lastAlong||0;let i=NAV.lastI||0;while(i<NAV.coords.length-1&&NAV.cum[i]<base+m)i++;return NAV.coords[i];}
+async function navBlock(reason,at){
+  if(NAV.blockBusy||!NAV.me||!NAV.active)return;const n=NAV.stops[NAV.next];if(!n)return;NAV.blockBusy=true;
+  showAlert('⛔ Cerco un percorso alternativo verso <b>'+esc(n.name)+'</b>…');
+  try{
+    const mode=LS.get('motorotta_mode','curvy');const m=MODES[mode]||MODES.curvy;ROUTE_PREF={hw:m.hw,toll:$('#optToll').checked};
+    const avoid=at?[at]:[idxAhead(150),idxAhead(400)];
+    const res=await routeSafe([NAV.me,[n.p.lat,n.p.lon]],false,null,ROUTE_PREF,avoid);
+    if(res.engine!=='valhalla')throw new Error('servizio non disponibile');
+    const r=res.rs[0];const v=NAV.len/NAV.dur;const remOrig=Math.max(0,(n.d-(NAV.lastAlong||0)))/v;const extra=Math.round((r.dur-remOrig)/60);
+    navProposal(r,n,extra,reason);
+  }catch(e){NAV.blockBusy=false;showAlert('Nessuna alternativa trovata ora: resto sul percorso.','Nessuna alternativa trovata. Resto sul percorso originale.');}
+}
+let propT=null,recog=null;
+function navProposal(r,n,extra,reason){
+  const box=$('#blockAsk');let k=12;
+  const txt=`${reason==='closure'?'⛔ Chiusura sul percorso. ':'⛔ Strada bloccata. '}Alternativa verso <b>${esc(n.name)}</b>: ${km(r.dist)}, ${extra>=0?'+'+extra:extra} min. <div class="grid2" style="margin-top:6px"><button id="pYes" class="okb" style="padding:10px;border-radius:10px">✅ SÌ, cambia</button><button id="pNo" style="padding:10px;border-radius:10px;background:#333;color:#fff">✖ NO</button></div><div id="pCount" style="font-size:12px;margin-top:4px"></div>`;
+  box.innerHTML=txt;box.classList.add('on');$('#alertBanner').classList.remove('on');
+  const done=(ok,how)=>{clearInterval(propT);try{recog&&recog.abort();}catch(e){}recog=null;box.classList.remove('on');NAV.blockBusy=false;
+    if(ok){const cut=(n.ci||0)+1;const tail=NAV.coords.slice(cut);
+      const man=(r.man||[]).filter(m=>![4,5,6].includes(m.type)).concat((NAV.man||[]).filter(m=>m.i>=cut).map(m=>({...m,i:m.i-cut+r.coords.length})));
+      NAV.stops.slice(NAV.next+1).forEach(s=>s.ci=null);n.ci=null;navSetGeometry(r.coords.concat(tail));NAV.man=man;NAV.mSaid={};NAV.lastI=0;NAV.offCount=0;NAV.quietUntil=Date.now()+20000;
+      navDraw();saveTrip();speak('Percorso alternativo attivato verso '+n.name+'.');navStatus('✅ Percorso alternativo verso '+esc(n.name),'#16351f');}
+    else speak(how==='no'?'Va bene, resto sul percorso originale.':'Nessuna risposta: proseguo sul percorso originale.');};
+  $('#pYes').onclick=()=>done(true);$('#pNo').onclick=()=>done(false,'no');
+  propT=setInterval(()=>{k--;$('#pCount')&&($('#pCount').textContent=`Senza risposta proseguo sul percorso originale tra ${Math.max(0,k)} s · puoi dire “sì” o “no”`);if(k<=0)done(false);},1000);
+  const say=`${reason==='closure'?'Chiusura sul percorso.':'Strada bloccata.'} Percorso alternativo verso ${n.name}, ${extra>=0?extra+' minuti in più':Math.abs(extra)+' minuti in meno'}. Dì sì per accettare, no per rifiutare.`;
+  if(!('speechSynthesis' in window)){listenYesNo(done);return;}
+  speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(say);u.lang='it-IT';u.onend=()=>listenYesNo(done);speechSynthesis.speak(u);
+}
+function listenYesNo(done){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR)return;
+  try{recog=new SR();recog.lang='it-IT';recog.interimResults=false;recog.maxAlternatives=3;
+    recog.onresult=e=>{const t=[...e.results[0]].map(x=>x.transcript.toLowerCase()).join(' ');
+      if(/\b(s[iì]|accetta|ok|va bene|cambia)\b/.test(t))done(true);else if(/\bno\b|rifiuta/.test(t))done(false,'no');};
+    recog.onerror=()=>{};recog.start();}catch(e){}
+}
+
 /* ===== viaggio in corso: memoria anche se chiudi l'app ===== */
 function saveTrip(){
   if(!NAV.active)return;const r=S.routes[S.sel];if(!r)return;NAV.savedAt=Date.now();
@@ -1592,6 +1650,7 @@ function navStartCardUI(){tripCardUI();
 }
 $('#navStartBtn').onclick=()=>{unlockAudio();startNav();};
 $('#navStop').onclick=()=>{stopNav(false);};
+$('#navBlock').onclick=()=>{unlockAudio();navBlock('manual');};
 $('#tripResume').onclick=()=>{unlockAudio();resumeTrip();};
 $('#tripClose').onclick=()=>{const b=$('#tripClose');if(!b.dataset.c){b.dataset.c=1;b.textContent='Tocca di nuovo per chiudere';return;}b.dataset.c='';b.textContent='🏁 Chiudi viaggio';clearTrip();toast('Viaggio chiuso');};
 $('#navSkip').onclick=()=>{const n=NAV.stops[NAV.next];if(n&&NAV.next<NAV.stops.length-1){navAdvance('skip');navUI(null);}};
@@ -1605,11 +1664,13 @@ const POI_CATS=[
   {k:'rovine',ic:'🏛️',n:'Rovine e città abbandonate',s:'Rovine / luogo abbandonato'},{k:'borgo',ic:'🏘️',n:'Borghi storici',s:'Borgo storico'},
   {k:'trattoria',ic:'🍝',n:'Trattorie',s:'Trattoria'},{k:'osteria',ic:'🍷',n:'Osterie',s:'Osteria'},{k:'ristorante',ic:'🍽️',n:'Ristoranti',s:'Ristorante'},
   {k:'agriturismo',ic:'🌾',n:'Agriturismi',s:'Agriturismo'},{k:'rifugio',ic:'⛰️',n:'Rifugi raggiungibili su strada',s:'Rifugio raggiungibile su strada'},
-  {k:'spa',ic:'💆',n:'SPA',s:'SPA'},{k:'agrispa',ic:'🌾💆',n:'Agriturismi con SPA',s:'Agriturismo con SPA'}];
+  {k:'passo',ic:'🏔️',n:'Passi di montagna',s:'Passo di montagna'},{k:'spa',ic:'💆',n:'SPA',s:'SPA'},{k:'agrispa',ic:'🌾💆',n:'Agriturismi con SPA',s:'Agriturismo con SPA'}];
 const FOOD_CATS=['trattoria','osteria','ristorante','agriturismo','agrispa','rifugio'];
 const DISC={items:[],state:'idle',sig:'',layer:null,
   cats:LS.get('motorotta_disc_cats',POI_CATS.map(c=>c.k)),radius:LS.get('motorotta_disc_r',5)};
 const RATE_KEY='motorotta_poi_rates';
+const SEL_KEY='motorotta_poi_sel';const sels=()=>LS.get(SEL_KEY,{});
+function toggleSel(i){const all=sels();if(all[i.key])delete all[i.key];else all[i.key]={name:i.name,cat:i.cat,p:[+i.p[0].toFixed(5),+i.p[1].toFixed(5)],tel:i.t.phone||i.t['contact:phone']||'',oh:i.t.opening_hours||'',ele:i.t.ele||'',t:Date.now()};LS.set(SEL_KEY,all);}
 const rates=()=>LS.get(RATE_KEY,{});
 const catOf=k=>POI_CATS.find(c=>c.k===k)||{ic:'📍',n:'',s:''};
 const GIORNI={Mo:'lunedì',Tu:'martedì',We:'mercoledì',Th:'giovedì',Fr:'venerdì',Sa:'sabato',Su:'domenica'};
@@ -1632,6 +1693,7 @@ function classify(t){
   if(/^eremo\b|\beremo\b/.test(nm)||t['monastery:type']==='hermitage')out.push('eremo');
   else if(/abbazia|badia|certosa/.test(nm)||t.amenity==='monastery'||t.historic==='monastery'||t.building==='monastery')out.push('abbazia');
   if(t.historic==='castle'||/^castello\b|^rocca\b/.test(nm)&&t.historic)out.push('castello');
+  if(t.mountain_pass==='yes'||(t.natural==='saddle'&&/^(passo|valico|colle|forca|sella|bocca)/.test(nm)))out.push('passo');
   if(t.historic==='ruins'||t.historic==='archaeological_site'||t['abandoned:place']||(t.place&&t.abandoned==='yes'))out.push('rovine');
   if(t.historic==='citywalls'||t.historic==='city_gate'||(t.place&&(t.historic||t.heritage)))out.push('borgo');
   if(t.amenity==='restaurant'){if(/trattoria/.test(nm))out.push('trattoria');else if(/osteria|hostaria/.test(nm))out.push('osteria');else if(!isAgri&&!/rifugio/.test(nm))out.push('ristorante');}
@@ -1646,6 +1708,7 @@ function poiQuery(line,R){
   const want=new Set(DISC.cats);const q=[];
   if(want.has('eremo')||want.has('abbazia')){q.push(`nwr${a}["amenity"="monastery"];`,`nwr${a}["historic"="monastery"];`,`nwr${a}["name"~"^(Eremo|Abbazia|Badia|Certosa)",i];`);}
   if(want.has('castello'))q.push(`nwr${a}["historic"="castle"];`);
+  if(want.has('passo'))q.push(`node${a}["mountain_pass"="yes"];`,`node${a}["natural"="saddle"]["name"~"^(Passo|Valico|Colle|Forca|Sella|Bocca)",i];`);
   if(want.has('rovine'))q.push(`nwr${a}["historic"~"^(ruins|archaeological_site)$"];`,`nwr${a}["abandoned:place"];`);
   if(want.has('borgo'))q.push(`nwr${a}["historic"~"^(citywalls|city_gate)$"];`,`node${a}["place"~"^(village|hamlet|town)$"]["historic"];`,`node${a}["place"~"^(village|hamlet|town)$"]["heritage"];`);
   if(want.has('trattoria')||want.has('osteria'))q.push(`nwr${af}["amenity"="restaurant"]["name"~"trattoria|osteria|hostaria",i];`);
@@ -1691,6 +1754,19 @@ async function discSearch(){
   renderDisc();drawDiscLayer();
 }
 const routeSig=()=>{const r=S.routes[S.sel];return r?(r.len|0)+'|'+S.sel+'|'+DISC.radius+'|'+DISC.cats.join(','):'';};
+let selLayer=null;
+function drawSelLayer(){try{if(!selLayer)selLayer=L.layerGroup().addTo(map);selLayer.clearLayers();
+  Object.entries(sels()).forEach(([k,v])=>L.marker(v.p,{icon:L.divIcon({className:'',html:`<div style="background:#fff;border:2px solid #f26b00;border-radius:12px;padding:1px 4px;font-size:15px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.4)">📌${catOf(v.cat).ic}</div>`,iconSize:[44,24],iconAnchor:[22,12]})})
+    .bindPopup(`<b>${esc(v.name)}</b><br>${catOf(v.cat).s}${v.ele?' · '+Math.round(parseFloat(v.ele))+' m':''}${v.tel?'<br>📞 '+esc(v.tel):''}${v.oh&&closedDays(v.oh)?'<br>Chiuso: '+closedDays(v.oh):''}`).addTo(selLayer));}catch(e){}}
+function renderSelCard(){const box=$('#selCard');if(!box)return;const all=Object.entries(sels());const r=S.routes[S.sel];
+  if(!all.length){box.style.display='none';return;}box.style.display='block';
+  const st=S.stops.filter(x=>x.p);
+  box.innerHTML='<h3>📌 Luoghi selezionati in Scopri</h3>'+all.map(([k,v])=>{let near='';if(r){const pr=projKm(r,v.p);let best=null;st.forEach(x=>{const d=hav([x.p.lat,x.p.lon],v.p);if(!best||d<best.d)best={d,n:(x.p.name||'').split(',')[0]};});
+      near=`km ${Math.round(pr.km)} · ${pr.d<1000?Math.round(pr.d)+' m':(pr.d/1000).toFixed(1)+' km'} dal percorso${best?' · vicino a '+esc(best.n):''}`;}
+    return `<div class="sv"><div style="font-size:20px">${catOf(v.cat).ic}</div><div class="n"><b>${esc(v.name)}</b><div class="mut">${catOf(v.cat).s}${near?' · '+near:''}</div></div><button class="ib" data-seltappa="${k}">➕ tappa</button><button class="ib" data-selrm="${k}">✕</button></div>`;}).join('')+'<div class="note">Non sono tappe obbligatorie: li vedi sulla mappa e in navigazione. Tocca “➕ tappa” per fermarti lì.</div>';
+  box.querySelectorAll('[data-seltappa]').forEach(b=>b.onclick=()=>{const v=sels()[b.dataset.seltappa];S.stops.splice(S.stops.length-1,0,{p:{lat:v.p[0],lon:v.p[1],name:v.name},text:v.name});renderStops();toast('Aggiunta come tappa: ricalcola il percorso');window.scrollTo({top:0,behavior:'smooth'});});
+  box.querySelectorAll('[data-selrm]').forEach(b=>b.onclick=()=>{const all=sels();delete all[b.dataset.selrm];LS.set(SEL_KEY,all);drawSelLayer();renderSelCard();});
+}
 function rateBadge(rt){if(!rt)return '';const f=rt.food?'🍴'+rt.food:'',sv=rt.service?' 🛎️'+rt.service:'',pr=rt.price?' '+'€'.repeat(rt.price):'';return `<span class="badge" style="background:#3a2f12">${rt.shared?'👥 ':'⭐ '}${f}${sv}${pr}</span>`;}
 function renderDisc(){
   const box=$('#tab-disc');if(!box)return;const r=S.routes[S.sel];
@@ -1710,7 +1786,7 @@ function renderDisc(){
         h+=`<div class="card"><h3>${a&&b?esc(a.name)+' → '+esc(b.name):'Lungo il percorso'}</h3>`+groups[g].sort((x,y)=>x.km-y.km).map(i=>{
           const c=catOf(i.cat),rt=rates()[i.key];
           return `<div class="sv" data-poi="${i.key}" style="cursor:pointer"><div style="font-size:22px;width:30px;text-align:center">${c.ic}</div><div class="n"><b>${esc(i.name)}</b> ${rateBadge(rt)}
-            <div class="mut">${c.s} · km ${Math.round(i.km)}${i.near?' · vicino a '+esc(i.near):''} · ${i.off<1000?Math.round(i.off)+' m':(i.off/1000).toFixed(1)+' km'} dal percorso${closedDays(i.t.opening_hours)?' · chiuso '+closedDays(i.t.opening_hours):''}</div></div><span class="mut">›</span></div>`;}).join('')+'</div>';
+            <div class="mut">${c.s}${i.t.ele?' · '+Math.round(parseFloat(i.t.ele))+' m s.l.m.':''} · km ${Math.round(i.km)}${i.near?' · vicino a '+esc(i.near):''} · ${i.off<1000?Math.round(i.off)+' m':(i.off/1000).toFixed(1)+' km'} dal percorso${closedDays(i.t.opening_hours)?' · chiuso '+closedDays(i.t.opening_hours):''}</div></div><span class="mut">›</span></div>`;}).join('')+'</div>';
       });
     }
   }
@@ -1744,6 +1820,7 @@ function openPoi(key){
     ${web?`<li>🌐 <a href="${esc(web.startsWith('http')?web:'https://'+web)}" target="_blank" rel="noopener" style="color:var(--acc)">sito web</a></li>`:''}
     ${wp?`<li>📖 <a href="${esc(wp)}" target="_blank" rel="noopener" style="color:var(--acc)">Wikipedia</a></li>`:''}
    </ul>
+   <button id="poiSel" class="${sels()[key]?'okb':''}" style="width:100%;margin:8px 0 0;padding:11px;border-radius:10px">${sels()[key]?'📌 Selezionato – mostrato sul percorso (tocca per togliere)':'📌 Seleziona: mostralo sul percorso'}</button>
    <div class="grid2" style="margin:8px 0"><a class="navbtn" href="${navToUrl(i.p)}" target="_blank" rel="noopener">🧭 Portami qui</a><button id="poiAdd">➕ Aggiungi come tappa</button></div>
    <a class="navbtn" href="https://www.google.com/maps/search/?api=1&query=${gq}" target="_blank" rel="noopener" style="margin-bottom:10px">⭐ Recensioni e prezzi su Google Maps</a>
    <div class="card" style="margin:0"><h3>La tua valutazione${rt.shared?' <span class="mut">(ricevuta da un amico)</span>':''}</h3>
@@ -1757,6 +1834,7 @@ function openPoi(key){
   sh.querySelectorAll('.stars').forEach(g=>g.querySelectorAll('span').forEach(s=>s.onclick=()=>{cur[g.dataset.id]=+s.dataset.v;
     g.querySelectorAll('span[data-v]').forEach(x=>x.classList.toggle('on',+x.dataset.v>0&&+x.dataset.v<=cur[g.dataset.id]));}));
   $('#poiX').onclick=()=>sh.classList.remove('on');
+  $('#poiSel').onclick=()=>{toggleSel(i);sh.classList.remove('on');renderDisc();drawDiscLayer();drawSelLayer();renderSelCard();toast(sels()[key]?'Selezionato: lo vedrai sul percorso':'Tolto dai selezionati');};
   $('#poiAdd').onclick=()=>{S.stops.splice(S.stops.length-1,0,{p:{lat:i.p[0],lon:i.p[1],name:i.name},text:i.name});renderStops();sh.classList.remove('on');toast('Aggiunta come tappa: ricalcola il percorso');window.scrollTo({top:0,behavior:'smooth'});showTab('routes');};
   $('#poiSave').onclick=()=>{const all=rates();all[key]={...cur,note:$('#poiNote').value.trim(),name:i.name,cat:i.cat,p:[+i.p[0].toFixed(5),+i.p[1].toFixed(5)],t:Date.now()};
     LS.set(RATE_KEY,all);sh.classList.remove('on');renderDisc();drawDiscLayer();toast('Valutazione salvata');};
@@ -1789,26 +1867,33 @@ function fuelPlan(r){
   const st=(r.fuelSt||[]).filter(okF);const stops=[];let pos=0,range=rangeNow(),guard=0,warn=null;
   const tAt=km=>S.dep+r.dur*1000*(km/tot)+stops.length*600000;
   const night=t=>{const h=new Date(t).getHours();return h>=20||h<7;};
+  const BR=/eni|agip|q8|^ip\b|esso|tamoil|shell|total|api\b|erg/i;
+  const safety=x=>(x.h24?3:0)+(x.services?3:0)+(BR.test(x.name||'')?2:0)+(x.off<120?1:0);
   while(pos+range-M<tot&&guard++<20){
-    let limit=pos+range-M;
-    let cands=st.filter(x=>x.km>pos+2&&x.km<=limit);
-    let prim=null;
+    const limit=pos+range-M;let prim=null;
     if(limit<=pos+2){prim=st.find(x=>x.km>pos+0.5)||null;warn='Autonomia già vicina al margine: fai rifornimento al primo distributore.';}
-    else if(cands.length){
-      prim=cands[cands.length-1];
-      if(night(tAt(prim.km))){const h24=cands.filter(x=>x.h24&&x.km>=limit-40);if(h24.length)prim=h24[h24.length-1];}
+    else{
+      // un distributore è "sicuro" se dopo di lui c'è un distributore di riserva raggiungibile restando sopra il margine
+      const safe=st.filter(x=>x.km>pos+2&&x.km<=limit&&st.some(y=>y.km>x.km+2&&y.km<=limit));
+      const pool=safe.length?safe:st.filter(x=>x.km>pos+2&&x.km<=limit);
+      if(pool.length){const lastKm=pool[pool.length-1].km;const win=pool.filter(x=>x.km>=lastKm-(night(tAt(lastKm))?45:30));
+        prim=win.reduce((a,b)=>safety(b)>safety(a)||(safety(b)===safety(a)&&b.km>a.km)?b:a);
+        if(!safe.length)warn='Dopo una sosta non c’è un distributore di riserva entro il margine: valuta di fare il pieno prima.';}
     }
     if(!prim||prim.km>pos+range){const km=Math.max(pos+1,Math.min(limit,tot));prim={km,p:pointAtKm(r,km),name:'Nessun distributore trovato',synthetic:true};
       warn=S.fuelState==='done'?'In un tratto non ho trovato distributori sul percorso: fai il pieno prima o scegli una tappa in un centro abitato.':null;}
-    const reach=pos+range-5;
-    let bk=st.filter(x=>x.km>prim.km+3&&x.km<=reach)[0]||null;
-    if(!bk){const bef=st.filter(x=>x.km<prim.km-3&&x.km>pos+2);bk=bef[bef.length-1]||null;}
+    let bk=st.filter(x=>x.km>prim.km+2&&x.km<=pos+range-5)[0]||null;
+    if(!bk){const bef=st.filter(x=>x.km<prim.km-2&&x.km>pos+2);bk=bef[bef.length-1]||null;}
     const s={...prim,kind:'primary',n:stops.length+1,t:tAt(prim.km),rangeArr:range-(prim.km-pos)};
     if(bk)s.backup={...bk,t:tAt(bk.km),rangeArr:range-(bk.km-pos)};
     stops.push(s);pos=prim.km;range=full;
   }
-  const need=tot*c/100;
-  return {c,eff:e.eff,need,cost:need*(SET.moto.price||0),stops,range:rangeNow(),full,M,warn,endRange:pos+range-tot};
+  // anche se non serve fermarsi, segnalo sempre un distributore designato (rosso) e uno di riserva (azzurro)
+  if(!stops.length&&st.length){const lim=Math.min(tot,pos+range-M);const pool=st.filter(x=>x.km<=lim);const p0=pool.length?pool.reduce((a,b)=>safety(b)>safety(a)||(safety(b)===safety(a)&&b.km>a.km)?b:a):st[0];
+    const bk=st.find(x=>x.km>p0.km+2)||st.slice().reverse().find(x=>x.km<p0.km-2)||null;
+    const s={...p0,kind:'primary',optional:true,n:1,t:tAt(p0.km),rangeArr:range-(p0.km-pos)};if(bk)s.backup={...bk,t:tAt(bk.km),rangeArr:range-(bk.km-pos)};stops.push(s);}
+  const need=tot*c/100;const req=stops.filter(x=>!x.optional).length;
+  return {c,eff:e.eff,need,cost:need*(SET.moto.price||0),stops,req,range:rangeNow(),full,M,warn,endRange:pos+range-tot};
 }
 /* distributori reali lungo il percorso (OpenStreetMap) */
 S.fuelState='idle';
@@ -1826,12 +1911,15 @@ async function fetchFuel(){
   try{
     const lines=S.routes.map(r=>{const n=Math.min(300,Math.max(20,Math.round(r.len/500)));const pts=[];
       for(let k=0;k<=n;k++){pts.push(pointAtKm(r,r.len/1000*k/n));}return pts.map(p=>p[0].toFixed(5)+','+p[1].toFixed(5)).join(',');});
-    const q='[out:json][timeout:30];(\n'+lines.map(a=>`nwr(around:400,${a})["amenity"="fuel"];`).join('\n')+'\n);out tags center 600;';
+    const q='[out:json][timeout:30];(\n'+lines.map(a=>`nwr(around:400,${a})["amenity"="fuel"];nwr(around:600,${a})["highway"~"^(services|rest_area)$"];`).join('\n')+'\n);out tags center 900;';
     const res=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:'data='+encodeURIComponent(q),headers:{'Content-Type':'application/x-www-form-urlencoded'}});
     const j=await res.json();
-    const all=(j.elements||[]).map(e=>{const t=e.tags||{};const lat=e.lat??(e.center&&e.center.lat),lon=e.lon??(e.center&&e.center.lon);if(lat==null)return null;
+    const svc=(j.elements||[]).filter(e=>e.tags&&/^(services|rest_area)$/.test(e.tags.highway||'')).map(e=>({p:[e.lat??(e.center&&e.center.lat),e.lon??(e.center&&e.center.lon)],name:e.tags.name||(e.tags.highway==='services'?'Area di servizio':'Area di sosta'),brand:e.tags.brand||e.tags.operator||''})).filter(x=>x.p[0]!=null);
+    const all=(j.elements||[]).filter(e=>e.tags&&e.tags.amenity==='fuel').map(e=>{const t=e.tags||{};const lat=e.lat??(e.center&&e.center.lat),lon=e.lon??(e.center&&e.center.lon);if(lat==null)return null;
+      const sv=svc.find(x=>hav(x.p,[lat,lon])<350);
       const oh=t.opening_hours||'';const h24=oh==='24/7'||t.self_service==='yes'||t.automated==='yes';
-      return {p:[lat,lon],name:t.brand||t.name||t.operator||'Distributore',addr:[t['addr:street'],t['addr:city']].filter(Boolean).join(', '),oh,h24,lpg:t['fuel:lpg'],cng:t['fuel:cng'],diesel:t['fuel:diesel'],o95:t['fuel:octane_95']};}).filter(Boolean);
+      const base=t.brand||t.name||t.operator||'';const nm=sv?(base&&!sv.name.toLowerCase().includes(base.toLowerCase())?base+' – '+sv.name:sv.name):(base||'Distributore');
+      return {p:[lat,lon],name:nm,services:!!sv||/area di servizio|autogrill/i.test(t.name||''),addr:[t['addr:street'],t['addr:city']].filter(Boolean).join(', '),oh,h24,lpg:t['fuel:lpg'],cng:t['fuel:cng'],diesel:t['fuel:diesel'],o95:t['fuel:octane_95']};}).filter(Boolean);
     S.routes.forEach(r=>{
       const out=[];all.forEach(s=>{const pr=projKm(r,s.p);if(pr.d<=450&&!out.some(o=>hav(o.p,s.p)<150))out.push({...s,km:pr.km,off:Math.round(pr.d)});});
       r.fuelSt=out.sort((a,b)=>a.km-b.km);});
@@ -1982,14 +2070,17 @@ function makePoster(meta,a,f,photo){
 }
 
 /* ================= allarme caduta ================= */
+const emPhones=()=>SET.contacts.map(c=>(c.p||'').replace(/[^\d+]/g,'')).filter(x=>x.length>5);
+function smsUrl(body){const ph=emPhones();const ios=/iPhone|iPad|Mac/.test(navigator.userAgent);
+  if(ios)return ph.length>1?`sms:/open?addresses=${ph.join(',')}&body=${encodeURIComponent(body)}`:`sms:${ph[0]||''}&body=${encodeURIComponent(body)}`;
+  return `sms:${ph.join(',')}?body=${encodeURIComponent(body)}`;}
 let sosT=null,sosAl=null;
 function sosStart(test){
   const ov=$('#sos');ov.classList.add('on');let n=30;$('#sosCount').textContent=n;
   const upd=()=>{const pos=RD.lastFix?RD.lastFix.p:null;
-    const msg=`${test?'[PROVA] ':''}EMERGENZA: possibile caduta in moto. ${pos?'Posizione: https://maps.google.com/?q='+pos[0].toFixed(5)+','+pos[1].toFixed(5):'Posizione non disponibile.'} Inviato da GoRide & Weather.`;
-    const ph=(SET.emPhone||'').replace(/[^\d+]/g,'');const sep=/iPhone|iPad|Mac/.test(navigator.userAgent)?'&':'?';
-    $('#sosSms').href=`sms:${ph}${sep}body=${encodeURIComponent(msg)}`;
-    $('#sosSms').textContent=ph?`📩 Invia SMS a ${SET.emName||ph}`:'📩 Prepara SMS (imposta il contatto)';};
+    const msg=`${test?'[PROVA] ':''}EMERGENZA: possibile incidente (${esc(V().name)}). ${new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})} ${pos?'Posizione: https://maps.google.com/?q='+pos[0].toFixed(5)+','+pos[1].toFixed(5):'Posizione non disponibile.'} Inviato da GoRide & Weather.`;
+    const ph=emPhones();$('#sosSms').href=smsUrl(msg);
+    $('#sosSms').textContent=ph.length?`📩 Invia SMS a ${ph.length} contatt${ph.length>1?'i':'o'}`:'📩 Prepara SMS (imposta i contatti)';};
   upd();
   clearInterval(sosT);clearInterval(sosAl);
   sosT=setInterval(()=>{n--;$('#sosCount').textContent=Math.max(0,n);beep(n>0?660:990,200,n>0?0.3:0.9);
@@ -2069,9 +2160,11 @@ function renderTraffic(){
 document.body.classList.toggle('dark',!!SET.dark);initGarageForm();vehSelUI();$('#vehSel').onchange=e=>setActiveVeh(e.target.value);
 $('#poiSheet').addEventListener('click',e=>{if(e.target.id==='poiSheet')e.target.classList.remove('on');});
 renderStops();renderSaved();initSettings();
+setTimeout(()=>{drawSelLayer();renderSelCard();},200);
 setTimeout(()=>{if(LS.get('motorotta_trip',null)){showView('ride');toast('Hai un viaggio in corso: tocca Riprendi');}},300);
 $('#routeMode').value=LS.get('motorotta_mode','curvy');
 $('#fuelNow').value=Math.round(SET.moto.auto);$('#fuelNow').addEventListener('change',()=>{if(S.routes.length)renderAll(false);});
+try{$('#optLoop').checked=LS.get('motorotta_loop',false);$('#optLoop').onchange=e=>LS.set('motorotta_loop',e.target.checked);}catch(e){}
 try{$('#optAuto').checked=LS.get('motorotta_autopos',false);$('#optAuto').onchange=e=>{LS.set('motorotta_autopos',e.target.checked);if(e.target.checked&&!S.stops[0].p)geoLocate(0);};}catch(e){}
 autoStart();
 if(location.hash.startsWith('#r')){try{applyPayload(b64d(location.hash.slice(2)));calc();}catch(e){console.warn(e);}}
