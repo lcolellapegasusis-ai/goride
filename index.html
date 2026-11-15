@@ -193,7 +193,7 @@ select{width:100%;background:var(--inp);color:var(--tx);border:1px solid var(--l
 
   <div class="foot">
     Mappe © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · Percorsi: Valhalla (profilo moto, server FOSSGIS) e OSRM (Open Source Routing Machine) · Ricerca luoghi: Photon · Meteo: <a href="https://open-meteo.com/">Open-Meteo</a> (modelli ECMWF/ICON/GFS).<br>
-    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">Versione 15 nov 2026 · rilascio 7 (elenco passi di montagna)</b>
+    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">Versione 15 nov 2026 · rilascio 8 (cerca distributori nell’app)</b>
   </div>
 </main>
 </div>
@@ -213,6 +213,7 @@ select{width:100%;background:var(--inp);color:var(--tx);border:1px solid var(--l
       <div class="kpi"><span class="mut">Arrivo finale</span><b id="navTot">–</b><span class="mut" id="navTotInfo"></span></div>
     </div>
     <div class="grid2" style="margin-top:8px"><a id="navGm" class="navbtn" href="#" target="_blank" rel="noopener">🧭 Svolte su Google (questo tratto)</a><button id="navSkip">⏭ Salta tappa</button></div>
+    <button id="navFuelBtn" style="width:100%;margin-top:8px">⛽ Distributori vicini a me</button>
     <button id="navBlock" style="width:100%;margin-top:8px;background:#000;color:#fff;border:2px solid #e60000;font-weight:700">⛔ Strada bloccata: trova alternativa</button>
     <button id="navStop" style="width:100%;margin-top:8px">🏁 Chiudi viaggio</button>
   </div>
@@ -804,7 +805,7 @@ function drawMap(fit){
     L.marker(p.p,{icon:ic}).bindPopup(popup(p)).addTo(layer);
   });
   try{const mk=(x,col,title)=>L.marker(x.p,{icon:L.divIcon({className:'',html:`<div style="width:24px;height:24px;border-radius:50%;background:${col};border:2px solid #111;display:flex;align-items:center;justify-content:center;font-size:13px">⛽</div>`,iconSize:[24,24],iconAnchor:[12,12]})})
-      .bindPopup(`<b>${title}</b><br>${esc(x.synthetic?'Nessun distributore trovato':x.name)}<br>km ${Math.round(x.km)} · ~${fmtT(x.t)}<br>autonomia all’arrivo ${Math.round(x.rangeArr)} km<br><a href="${x.synthetic?gasUrl(x.p):navToUrl(x.p)}" target="_blank" rel="noopener">${x.synthetic?'Cerca distributori':'Portami qui'}</a>`).addTo(layer);
+      .bindPopup(`<b>${title}</b><br>${esc(x.synthetic?'Nessun distributore trovato':x.name)}<br>km ${Math.round(x.km)} · ~${fmtT(x.t)}<br>autonomia all’arrivo ${Math.round(x.rangeArr)} km<br>${x.synthetic?`<a href="#" onclick="fuelSearchAt(${x.p[0]},${x.p[1]},'plan');return false">🔍 Cerca distributori qui</a>`:`<a href="${navToUrl(x.p)}" target="_blank" rel="noopener">Portami qui</a>`}`).addTo(layer);
     fuelPlan(r).stops.forEach(x=>{mk(x,'#e60000',x.optional?'Distributore consigliato':'Sosta rifornimento '+x.n);if(x.backup)mk(x.backup,'#29b6ff','Distributore di riserva');});}catch(e){console.warn(e);}
   const c=r.coords;
   L.circleMarker(c[0],{radius:7,color:'#fff',fillColor:'#3ecf6e',fillOpacity:1,weight:2}).addTo(layer);
@@ -842,7 +843,7 @@ function renderRoutes(){
      <div style="width:26px;height:26px;border-radius:50%;background:${kind==='p'?'#e60000':'#29b6ff'};display:flex;align-items:center;justify-content:center;flex:none;font-size:14px">⛽</div>
      <div style="flex:1"><b>${kind==='p'?(x.optional?'Distributore consigliato':'Sosta '+x.n):'Riserva'}${x.synthetic?'':': '+esc(x.name)}</b>${x.synthetic?' <span style="color:var(--r)">– nessun distributore trovato qui</span>':''}
      <div class="mut">km ${Math.round(x.km)} · ~${fmtT(x.t)} · autonomia all’arrivo <b style="color:${kind==='p'&&x.rangeArr<fp.M?'var(--r)':'inherit'}">${Math.round(x.rangeArr)} km</b>${x.off>100?' · '+x.off+' m dal percorso':''}${x.h24?' · 24h/self':x.oh?' · orari: '+esc(x.oh):''}</div>
-     <a href="${x.synthetic?gasUrl(x.p):navToUrl(x.p)}" target="_blank" rel="noopener" style="color:var(--acc);font-size:13px">${x.synthetic?'cerca distributori in zona':'portami qui'}</a></div></div>`;
+     ${x.synthetic?`<a href="#" data-fsearch="${x.p[0]},${x.p[1]}" style="color:var(--acc);font-size:13px;font-weight:700">🔍 cerca distributori qui (nella mappa dell’app)</a>`:`<a href="${navToUrl(x.p)}" target="_blank" rel="noopener" style="color:var(--acc);font-size:13px">portami qui</a>`}</div></div>`;
   h+=`<div class="card"><h3>⛽ Carburante e soste · ${KIND_IC[V().kind]||''} ${esc(V().name)} (${esc(V().fuel)})</h3>${['gpl','metano'].includes(V().fuel)?'<div class="note" style="color:var(--y)">Distributori '+(V().fuel==='gpl'?'GPL':'metano')+': i dati della mappa sono meno completi, verifica prima di partire.</div>':''}<div class="grid2">
     <div class="kpi"><span class="mut">Consumo previsto</span><b>${fp.need.toFixed(1)} litri</b><span class="mut">${fp.c.toFixed(1)} l/100 km ${fp.eff?'(dai tuoi pieni)':''}</span></div>
     <div class="kpi"><span class="mut">Costo stimato</span><b>€ ${fp.cost.toFixed(2)}</b><span class="mut">a ${(+SET.moto.price||0).toFixed(2)} €/${V().fuel==='metano'?'kg':'l'}</span></div>
@@ -850,6 +851,7 @@ function renderRoutes(){
     <div class="kpi"><span class="mut">Soste</span><b>${fp.req}</b><span class="mut">${fp.req?'+'+fp.req*10+' min circa':'non necessarie'} · arrivo con ${Math.round(fp.endRange)} km</span></div></div>
     ${S.fuelState==='loading'?'<div class="mut" style="margin-top:8px">⏳ Cerco i distributori lungo il percorso…</div>':''}
     ${fp.warn?`<div class="note" style="color:var(--y);margin-top:8px">⚠️ ${fp.warn}</div>`:''}
+    <button data-fsearch="route" style="width:100%;margin-top:8px">🔍 Cerca altri distributori vicino al percorso</button>
     ${fp.stops.map(x=>stLine(x,'p')+(x.backup?stLine(x.backup,'b'):'<div class="mut" style="padding-left:34px">Nessun distributore di emergenza vicino</div>')).join('')}
     <div class="note" style="margin-top:6px">🔴 Distributore designato per la sosta: scelto in sicurezza, anche prima del limite, solo se dopo di lui c’è un altro distributore raggiungibile restando sopra <b>${fp.M} km</b> di autonomia; preferisco aree di servizio, aperti 24h/self e marchi principali. 🔵 Riserva: il distributore successivo, sempre segnalato sul percorso. Distributori da OpenStreetMap: orari e servizio vanno sempre verificati.</div></div>`;
   h+=`<div class="card"><h3>Azioni</h3><button id="bNav" class="primary" style="margin:0 0 10px">▶︎ Naviga con GoRide</button><div class="links">
@@ -859,6 +861,7 @@ function renderRoutes(){
     <div class="mut">Google Maps ricostruisce il tragitto passando per 8 punti del percorso scelto; per seguirlo alla lettera usa l’export GPX (GPS Exchange Format) in un navigatore che lo supporta.</div></div>`;
   box.innerHTML=h;
   box.querySelectorAll('.rt').forEach(e=>e.onclick=()=>selectRoute(+e.dataset.i));
+  box.querySelectorAll('[data-fsearch]').forEach(e=>e.onclick=ev=>{ev.preventDefault();const v=e.dataset.fsearch;if(v==='route'){const c=map.getCenter();fuelSearchAt(c.lat,c.lng,'plan');}else{const [a,b]=v.split(',').map(Number);fuelSearchAt(a,b,'plan');}});
   bindProposal();
   if($('#useBest')){const b=bestTimes(r).reduce((x,y)=>y.score>x.score?y:x);$('#useBest').onclick=()=>{S.dep=b.dep;setDepInput(b.dep);renderAll(false);toast('Partenza impostata alle '+fmtT(b.dep));};}
   $('#bNav').onclick=()=>{unlockAudio();startNav();};
@@ -1089,6 +1092,57 @@ $('#gpxIn').addEventListener('change',async e=>{
   e.target.value='';
 });
 function setStopsFrom(pts){S.mode='route';S.routes=[];S.stops=pts.map(p=>({p:{lat:p.lat,lon:p.lon,name:p.name},text:p.name}));renderStops();}
+
+/* ================= cerca distributori direttamente nell'app ================= */
+let fsLayer=null;
+async function fuelSearchAt(lat,lon,ctx){
+  const sh=$('#poiSheet');sh.innerHTML=`<div class="sheet"><div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">⛽ Distributori vicini</h3><button id="fsX" class="ib">✕</button></div><div id="fsList"><div class="empty">⏳ Cerco i distributori…</div></div></div>`;
+  sh.classList.add('on');$('#fsX').onclick=()=>sh.classList.remove('on');
+  const fu=V().fuel;const okF=t=>fu==='gpl'?t['fuel:lpg']==='yes':fu==='metano'?t['fuel:cng']==='yes':fu==='diesel'?t['fuel:diesel']!=='no':t['fuel:octane_95']!=='no';
+  let found=[];
+  try{
+    for(const R of [5000,12000,25000]){
+      const q=`[out:json][timeout:30];(nwr(around:${R},${lat.toFixed(5)},${lon.toFixed(5)})["amenity"="fuel"];nwr(around:${R+600},${lat.toFixed(5)},${lon.toFixed(5)})["highway"~"^(services|rest_area)$"];);out tags center 300;`;
+      const res=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:'data='+encodeURIComponent(q),headers:{'Content-Type':'application/x-www-form-urlencoded'}});
+      const j=await res.json();const el=j.elements||[];
+      const svc=el.filter(e=>e.tags&&/^(services|rest_area)$/.test(e.tags.highway||'')).map(e=>({p:[e.lat??e.center.lat,e.lon??e.center.lon],name:e.tags.name||'Area di servizio'}));
+      found=el.filter(e=>e.tags&&e.tags.amenity==='fuel'&&okF(e.tags)).map(e=>{const t=e.tags,p=[e.lat??e.center.lat,e.lon??e.center.lon];const sv=svc.find(x=>hav(x.p,p)<350);
+        const base=t.brand||t.name||t.operator||'';const oh=t.opening_hours||'';
+        return {p,name:sv?(base&&!sv.name.toLowerCase().includes(base.toLowerCase())?base+' – '+sv.name:sv.name):(base||'Distributore'),oh,h24:oh==='24/7'||t.self_service==='yes'||t.automated==='yes',d:hav([lat,lon],p),key:e.type[0]+e.id};});
+      if(found.length>=3)break;
+    }
+  }catch(e){$('#fsList').innerHTML='<div class="empty">Ricerca non riuscita (rete). Riprova tra poco.</div>';return;}
+  const r=S.routes[S.sel];
+  found.forEach(f=>{if(r){const pr=projKm(r,f.p);f.off=pr.d;f.km=pr.km;}});
+  found.sort((a,b)=>ctx==='nav'?a.d-b.d:((a.off??a.d)-(b.off??b.d)));
+  try{if(!fsLayer)fsLayer=L.layerGroup().addTo(map);fsLayer.clearLayers();
+    found.forEach(f=>L.marker(f.p,{icon:L.divIcon({className:'',html:'<div style="width:22px;height:22px;border-radius:50%;background:#fff;border:2px solid #e60000;display:flex;align-items:center;justify-content:center;font-size:12px">⛽</div>',iconSize:[22,22],iconAnchor:[11,11]})}).bindPopup('<b>'+esc(f.name)+'</b>').addTo(fsLayer));}catch(e){}
+  $('#fsList').innerHTML=found.length?`<div class="mut" style="margin:6px 0">${fu.toUpperCase()} · tocca un distributore per inserirlo nel percorso come sosta${ctx==='nav'?' (diventa la prossima tappa)':''}.</div>`+found.slice(0,25).map((f,i)=>`<div class="sv" data-fs="${i}" style="cursor:pointer"><div style="font-size:20px">⛽</div><div class="n"><b>${esc(f.name)}</b>
+      <div class="mut">${(f.d/1000).toFixed(1)} km da qui${f.off!=null?' · '+(f.off<1000?Math.round(f.off)+' m':(f.off/1000).toFixed(1)+' km')+' dal percorso':''}${f.h24?' · 24h/self':f.oh?' · '+esc(f.oh):''}${closedDays(f.oh)?' · chiuso '+closedDays(f.oh):''}</div></div><span style="color:var(--acc);font-weight:700">➕</span></div>`).join('')
+    :'<div class="empty">Nessun distributore trovato entro 25 km.</div>';
+  $('#fsList').querySelectorAll('[data-fs]').forEach(e=>e.onclick=()=>{const f=found[+e.dataset.fs];sh.classList.remove('on');addFuelStop(f,ctx);});
+}
+async function navInsertStop(stop,label){
+  const nxt=NAV.stops[NAV.next];if(!nxt||!NAV.me){toast('Posizione non disponibile');return;}
+  navStatus('🔄 Inserisco '+esc(label)+'…','#4a3a12');
+  try{const mode=LS.get('motorotta_mode','curvy');const m=MODES[mode]||MODES.curvy;ROUTE_PREF={hw:m.hw,toll:$('#optToll').checked};
+    const r=(await routeSafe([NAV.me,[stop.p.lat,stop.p.lon],[nxt.p.lat,nxt.p.lon]],false,null)).rs[0];
+    const cut=(nxt.ci||0)+1;const tail=NAV.coords.slice(cut);
+    const man=(r.man||[]).filter(x=>![4,5,6].includes(x.type)).concat((NAV.man||[]).filter(x=>x.i>=cut).map(x=>({...x,i:x.i-cut+r.coords.length})));
+    NAV.stops.splice(NAV.next,0,{p:stop.p,name:stop.p.name,state:'todo'});
+    const si=S.stops.findIndex(x=>x.p&&x.p.lat===nxt.p.lat&&x.p.lon===nxt.p.lon);S.stops.splice(si>0?si:S.stops.length-1,0,stop);
+    NAV.stops.slice(NAV.next).forEach(x=>x.ci=null);navSetGeometry(r.coords.concat(tail));NAV.man=man;NAV.mSaid={};NAV.lastI=0;NAV.offCount=0;NAV.quietUntil=Date.now()+15000;
+    navDraw();saveTrip();navStatus('✅ Prossima tappa: '+esc(stop.p.name),'#16351f');speak(label+' aggiunto come prossima tappa.');
+  }catch(e){navStatus('📵 Impossibile ricalcolare ora','#4a3a12');toast('Ricalcolo non riuscito: riprova');}
+}
+function addFuelStop(f,ctx){
+  const stop={p:{lat:f.p[0],lon:f.p[1],name:'⛽ '+f.name},text:f.name};
+  if(ctx==='nav'&&NAV.active){
+    navInsertStop(stop,f.name);
+  }else{
+    const i=bestInsert(f.p);S.stops.splice(i,0,stop);renderStops();toast('⛽ '+f.name+' aggiunto come tappa: ricalcolo il percorso');calc();
+  }
+}
 
 /* ================= elenco passi di montagna → tappa ================= */
 const PASS_AREAS=[['route','Lungo il percorso calcolato (entro 30 km)'],['near','Vicino alla zona della mappa (80 km)'],
@@ -1701,6 +1755,7 @@ function navStartCardUI(){tripCardUI();
 }
 $('#navStartBtn').onclick=()=>{unlockAudio();startNav();};
 $('#navStop').onclick=()=>{stopNav(false);};
+$('#navFuelBtn').onclick=()=>{if(NAV.me)fuelSearchAt(NAV.me[0],NAV.me[1],'nav');else toast('In attesa del GPS…');};
 $('#navBlock').onclick=()=>{unlockAudio();navBlock('manual');};
 $('#tripResume').onclick=()=>{unlockAudio();resumeTrip();};
 $('#tripClose').onclick=()=>{const b=$('#tripClose');if(!b.dataset.c){b.dataset.c=1;b.textContent='Tocca di nuovo per chiudere';return;}b.dataset.c='';b.textContent='🏁 Chiudi viaggio';clearTrip();toast('Viaggio chiuso');};
