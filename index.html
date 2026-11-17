@@ -197,7 +197,7 @@ select{width:100%;background:var(--inp);color:var(--tx);border:1px solid var(--l
 
   <div class="foot">
     Mappe © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · Percorsi: Valhalla (profilo moto, server FOSSGIS) e OSRM (Open Source Routing Machine) · Ricerca luoghi: Photon · Meteo: <a href="https://open-meteo.com/">Open-Meteo</a> (modelli ECMWF/ICON/GFS).<br>
-    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">Versione 17 nov 2026 · rilascio 13 (tratti a rischio, distributori, Scopri per tappa)</b>
+    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">Versione 17 nov 2026 · rilascio 14 (aggiornamento automatico)</b>
   </div>
 </main>
 </div>
@@ -2479,6 +2479,16 @@ try{$('#optLoop').checked=LS.get('motorotta_loop',false);$('#optLoop').onchange=
 try{$('#optAuto').checked=LS.get('motorotta_autopos',false);$('#optAuto').onchange=e=>{LS.set('motorotta_autopos',e.target.checked);if(e.target.checked&&!S.stops[0].p)geoLocate(0);};}catch(e){}
 autoStart();
 if(location.hash.startsWith('#r')){try{applyPayload(b64d(location.hash.slice(2)));calc();}catch(e){console.warn(e);}}
+
+/* ================= aggiornamento automatico dell'app ================= */
+const APP_REL=14;
+async function checkUpdate(){
+  try{const r=await fetch('version.txt?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=parseInt((await r.text()).trim(),10);
+    if(v>APP_REL){const k='motorotta_upd_try';if(LS.get(k,0)===v)return;LS.set(k,v);toast('⬇️ Nuova versione disponibile: aggiorno l’app…');
+      setTimeout(()=>{if(NAV&&NAV.active)return;location.replace(location.pathname+'?v='+v);},1200);}}catch(e){}
+}
+setTimeout(checkUpdate,1500);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkUpdate();});
 </script>
 </body>
 </html>
