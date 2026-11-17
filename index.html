@@ -197,7 +197,7 @@ select{width:100%;background:var(--inp);color:var(--tx);border:1px solid var(--l
 
   <div class="foot">
     Mappe © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · Percorsi: Valhalla (profilo moto, server FOSSGIS) e OSRM (Open Source Routing Machine) · Ricerca luoghi: Photon · Meteo: <a href="https://open-meteo.com/">Open-Meteo</a> (modelli ECMWF/ICON/GFS).<br>
-    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">Versione 17 nov 2026 · rilascio 12 (passi e valichi sulla mappa)</b>
+    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">Versione 17 nov 2026 · rilascio 13 (tratti a rischio, distributori, Scopri per tappa)</b>
   </div>
 </main>
 </div>
@@ -380,9 +380,12 @@ async function revName(lat,lon){try{const r=await fetch(`https://photon.komoot.i
 function drawStopMarkers(){try{if(!stopLayer)stopLayer=L.layerGroup().addTo(map);stopLayer.clearLayers();
   S.stops.forEach((x,i)=>{if(!x.p)return;const last=i===S.stops.length-1;
     const lab=i===0?'P':last?'🏁':String(i);
-    const mk=L.marker([x.p.lat,x.p.lon],{draggable:S.mode!=='gpx',icon:L.divIcon({className:'',html:`<div style="min-width:26px;height:26px;padding:0 4px;border-radius:13px;background:${i===0?'#1fa855':last?'#111':'#f26b00'};color:#fff;border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px">${lab}</div>`,iconSize:[30,26],iconAnchor:[15,13]})})
+    const hl=typeof DISC!=='undefined'&&DISC.where===i;
+    const mk=L.marker([x.p.lat,x.p.lon],{draggable:S.mode!=='gpx',icon:L.divIcon({className:'',html:`<div style="${hl?'outline:4px solid #ffd400;':''}min-width:26px;height:26px;padding:0 4px;border-radius:13px;background:${i===0?'#1fa855':last?'#111':'#f26b00'};color:#fff;border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px">${lab}</div>`,iconSize:[30,26],iconAnchor:[15,13]})})
       .bindTooltip(esc((x.p.name||'').split(',')[0]));
     mk.on('dragend',async ev=>{const ll=ev.target.getLatLng();x.p={lat:ll.lat,lon:ll.lng,name:'…'};renderStops();x.p.name=await revName(ll.lat,ll.lng);x.text=x.p.name;renderStops();toast('Tappa spostata: ricalcola il percorso');});
+    mk.on('click',()=>{if(typeof DISC==='undefined'||!DISC.pick)return;DISC.where=i;DISC.pick=false;drawStopMarkers();showTab('disc');renderDisc();
+      toast('📍 Tappa scelta: '+(x.p.name||'').split(',')[0]+' — ora premi “Cerca”');const t=$('#tab-disc');if(t)t.scrollIntoView({behavior:'smooth',block:'start'});});
     mk.addTo(stopLayer);});}catch(e){}}
 function setTapMode(on){S.tapMode=on;const b=$('#tapBtn');if(b){b.classList.toggle('okb',on);b.textContent=on?'✋ Tocca la mappa… (fine)':'✋ Tappe sulla mappa';}
   if(on){toast('Tocca la mappa per aggiungere tappe; trascina i numeri per spostarle');window.scrollTo({top:0,behavior:'smooth'});}}
@@ -815,8 +818,47 @@ function renderAll(fit){try{PLAN_PASS&&(PLAN_PASS.sig='',PLAN_PASS.refresh());}c
   S.routes.forEach(r=>r.mostCurvy=S.routes.length>1&&nMax===1&&r.curv===curvMax);
   drawMap(fit);renderRoutes();renderMeteo();renderBest();
 }
-function isDanger(p){if(!p||!p.w)return false;const w=p.w;
-  return p.ice||[95,96,99].includes(w.code)||w.pr>=0.5||w.wg>=(isMoto()?50:70)||(w.vis!=null&&w.vis<1000)||w.sd>=0.02||(p.sc!=null&&p.sc<40);}
+function riskOf(p){ // livello 2 = pericolo (rosso), 1 = sconsigliato (arancione), 0 = ok
+  if(!p||!p.w)return {lvl:0,why:[]};const w=p.w,R=[],O=[];const g=isMoto()?50:70;
+  if(w.sd>=0.02)R.push('❄️ neve al suolo '+Math.round(w.sd*100)+' cm');
+  else if(p.ice)R.push('🧊 rischio ghiaccio ('+w.temp.toFixed(0)+'°C'+(w.pr>0?', pioggia':w.rh>=92?', umidità '+Math.round(w.rh)+'%':'')+')');
+  if([95,96,99].includes(w.code))R.push('⛈️ temporale');
+  if(w.code>=71&&w.code<=77||w.code===85||w.code===86)R.push('🌨️ neve in caduta');
+  if(w.pr>=0.5)R.push('🌧️ pioggia '+w.pr.toFixed(1)+' mm/h');
+  if(w.wg>=g)R.push('💨 raffiche '+Math.round(w.wg)+' km/h');
+  if(w.vis!=null&&w.vis<1000)R.push('🌫️ nebbia, visibilità '+Math.round(w.vis)+' m');
+  if(R.length)return {lvl:2,why:R};
+  if(p.sc!=null&&p.sc<40){
+    if(p.feel!=null&&p.feel<=8)O.push('🥶 percepita in sella '+p.feel.toFixed(0)+'°C (esterna '+w.temp.toFixed(0)+'°C)');
+    if(w.pr>0)O.push('🌦️ pioviggine '+w.pr.toFixed(1)+' mm/h');
+    if(w.ws>=30||w.wg>=35)O.push('💨 vento '+Math.round(w.ws)+' km/h, raffiche '+Math.round(w.wg));
+    if(w.temp>=33)O.push('🥵 caldo '+w.temp.toFixed(0)+'°C');
+    if(p.glare)O.push('😎 sole basso in faccia');
+    if(p.night)O.push('🌙 buio');
+    if(w.pp>=60&&w.pr===0)O.push('☔ probabilità pioggia '+Math.round(w.pp)+'%');
+    if(!O.length)O.push('📉 comfort basso ('+p.sc+'/100)');
+    return {lvl:1,why:O};}
+  return {lvl:0,why:[]};
+}
+function isDanger(p){return riskOf(p).lvl===2;}
+const RISKCOL=['#1e9bff','#ff9500','#e60000'];
+function riskSegs(r,ev){ // tratti continui a rischio
+  const out=[];if(!ev)return out;let cur=null;
+  ev.pts.forEach((p,i)=>{const nx=ev.pts[i+1];if(!nx)return;const a=riskOf(p),b=riskOf(nx);const lvl=Math.max(a.lvl,b.lvl);
+    if(!lvl){cur=null;return;}
+    if(!cur||cur.lvl!==lvl||cur.end!==i){cur={lvl,i0:i,end:i+1,km0:p.d/1000,km1:nx.d/1000,t0:p.t,t1:nx.t,why:new Map(),ci0:p.ci,ci1:nx.ci};out.push(cur);}
+    else{cur.end=i+1;cur.km1=nx.d/1000;cur.t1=nx.t;cur.ci1=nx.ci;}
+    [a,b].forEach(x=>{if(x.lvl===lvl)x.why.forEach(t=>{const k=t.replace(/[\d.,−-]+.*$/,'').trim();if(!cur.why.has(k))cur.why.set(k,t);});});});
+  return out;
+}
+function riskPopup(p){const rk=riskOf(p);
+  return `<div style="min-width:210px"><b>${rk.lvl===2?'🔴 Pericolo':rk.lvl===1?'🟠 Sconsigliato':'✅ Nessun rischio'}</b>${rk.why.length?'<br>'+rk.why.map(esc).join('<br>'):''}<hr style="border:0;border-top:1px solid #ddd;margin:5px 0">${popup(p)}</div>`;}
+let fuelAllLayer=null,FUEL_ALL=LS.get('motorotta_fuel_all',false);
+const PUMP_GREY='<div style="width:18px;height:18px;border-radius:50%;background:#7d8590;border:1.5px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center"><svg width="10" height="10" viewBox="0 0 24 24"><path fill="#fff" d="M4 3h9v18H4zM6 5v5h5V5zM15 8l3-3 1.5 1.5-1.5 1.5v9a2 2 0 0 1-4 0v-4h-1v-2h2v6h1V9z"/></svg></div>';
+try{const FCtl=L.Control.extend({onAdd(){const d=L.DomUtil.create('div','psctl'+(FUEL_ALL?' on':''));d.title='Tutti i distributori';d.innerHTML='⛽';d.style.marginTop='6px';
+  L.DomEvent.disableClickPropagation(d);d.onclick=()=>{FUEL_ALL=!FUEL_ALL;LS.set('motorotta_fuel_all',FUEL_ALL);d.classList.toggle('on',FUEL_ALL);
+    if(fuelAllLayer){if(FUEL_ALL)fuelAllLayer.addTo(map);else fuelAllLayer.remove();}toast(FUEL_ALL?'⛽ Tutti i distributori visibili':'⛽ Solo sosta (rossa) e riserva (azzurra)');};return d;}});
+  new FCtl({position:'topright'}).addTo(map);}catch(e){}
 function drawMap(fit){setTimeout(drawStopMarkers,0);
   layer.clearLayers();
   S.routes.forEach((r,i)=>{if(i===S.sel)return;
@@ -824,8 +866,10 @@ function drawMap(fit){setTimeout(drawStopMarkers,0);
   const r=S.routes[S.sel];if(!r)return;const ev=S.ev[S.sel];
   L.polyline(r.coords,{color:'#0b3d6e',weight:10,opacity:.35}).addTo(layer);
   L.polyline(r.coords,{color:'#1e9bff',weight:6,opacity:.95}).addTo(layer);
-  ev.pts.forEach((p,i)=>{const nx=ev.pts[i+1];if(!nx)return;
-    if(isDanger(p)||isDanger(nx))L.polyline(r.coords.slice(p.ci,nx.ci+2),{color:'#e60000',weight:7,opacity:.95}).addTo(layer);});
+  ev.pts.forEach((p,i)=>{const nx=ev.pts[i+1];if(!nx)return;const lvl=Math.max(riskOf(p).lvl,riskOf(nx).lvl);
+    const seg=r.coords.slice(p.ci,nx.ci+2);const pick=e=>{const q=hav([e.latlng.lat,e.latlng.lng],p.p)<=hav([e.latlng.lat,e.latlng.lng],nx.p)?p:nx;L.popup().setLatLng(e.latlng).setContent(riskPopup(q)).openOn(map);};
+    if(lvl)L.polyline(seg,{color:RISKCOL[lvl],weight:7,opacity:.95}).addTo(layer);
+    L.polyline(seg,{color:'#000',weight:22,opacity:0.001}).on('click',pick).addTo(layer);});
   const every=Math.max(1,Math.round(ev.pts.length/9));
   ev.pts.forEach((p,i)=>{
     if(!p.w||(i%every&&i!==ev.pts.length-1))return;
@@ -834,8 +878,10 @@ function drawMap(fit){setTimeout(drawStopMarkers,0);
   });
   try{const mk=(x,col,title)=>L.marker(x.p,{icon:L.divIcon({className:'',html:`<div style="width:24px;height:24px;border-radius:50%;background:${col};border:2px solid #111;display:flex;align-items:center;justify-content:center;font-size:13px">⛽</div>`,iconSize:[24,24],iconAnchor:[12,12]})})
       .bindPopup(`<b>${title}</b><br>${esc(x.synthetic?'Nessun distributore trovato':x.name)}<br>km ${Math.round(x.km)} · ~${fmtT(x.t)}<br>autonomia all’arrivo ${Math.round(x.rangeArr)} km<br>${x.synthetic?`<a href="#" onclick="fuelSearchAt(${x.p[0]},${x.p[1]},'plan');return false">🔍 Cerca distributori qui</a>`:`<a href="${navToUrl(x.p)}" target="_blank" rel="noopener">Portami qui</a>`}`).addTo(layer);
-    (r.fuelSt||[]).forEach(x=>L.circleMarker(x.p,{radius:6,color:'#e60000',weight:2,fillColor:'#fff',fillOpacity:1}).bindPopup(`<b>⛽ ${esc(x.name)}</b><br>km ${Math.round(x.km)} · ${x.off<1000?x.off+' m':(x.off/1000).toFixed(1)+' km'} dal percorso${x.h24?'<br>24h/self':x.oh?'<br>'+esc(x.oh):''}<br><a href="#" onclick="addFuelStop({p:[${x.p[0]},${x.p[1]}],name:'${esc(x.name).replace(/'/g,'’')}'},'plan');return false">➕ Usa come sosta (tappa)</a>`).addTo(layer));
-    fuelPlan(r).stops.forEach(x=>{mk(x,'#e60000',x.optional?'Distributore consigliato':'Sosta rifornimento '+x.n);if(x.backup)mk(x.backup,'#29b6ff','Distributore di riserva');});}catch(e){console.warn(e);}
+    if(!fuelAllLayer)fuelAllLayer=L.layerGroup();fuelAllLayer.clearLayers();if(FUEL_ALL)fuelAllLayer.addTo(map);
+    const fp0=fuelPlan(r);const used=new Set(fp0.stops.flatMap(x=>[x.p+'',x.backup?x.backup.p+'':'']));
+    (r.fuelSt||[]).filter(x=>!used.has(x.p+'')).forEach(x=>L.marker(x.p,{icon:L.divIcon({className:'',html:PUMP_GREY,iconSize:[18,18],iconAnchor:[9,9]})}).bindPopup(`<b>⛽ ${esc(x.name)}</b><br>km ${Math.round(x.km)} · ${x.off<1000?x.off+' m':(x.off/1000).toFixed(1)+' km'} dal percorso${x.h24?'<br>24h/self':x.oh?'<br>'+esc(x.oh):''}<br><a href="#" onclick="addFuelStop({p:[${x.p[0]},${x.p[1]}],name:'${esc(x.name).replace(/'/g,'’')}'},'plan');return false">➕ Usa come sosta (tappa)</a>`).addTo(fuelAllLayer));
+    fp0.stops.forEach(x=>{mk(x,'#e60000',x.optional?'Distributore consigliato':'Sosta rifornimento '+x.n);if(x.backup)mk(x.backup,'#29b6ff','Distributore di riserva');});}catch(e){console.warn(e);}
   const c=r.coords;
   L.circleMarker(c[0],{radius:7,color:'#fff',fillColor:'#3ecf6e',fillOpacity:1,weight:2}).addTo(layer);
   L.circleMarker(c[c.length-1],{radius:7,color:'#fff',fillColor:'#eb5757',fillOpacity:1,weight:2}).addTo(layer);
@@ -862,6 +908,12 @@ function renderRoutes(){
       <div class="mut">${km(r.len)} · ${fmtDur(r.dur)} · arrivo ${fmtT(S.dep+r.dur*1000)}</div>
       <div><span class="badge">Curve: ${curvLbl(r.curv)} (${Math.round(r.curv)}°/km)</span>${r.mostCurvy?'<span class="badge">🌀 la più curvosa</span>':''}${ev.missing?'<span class="badge">⚠️ oltre l’orizzonte meteo</span>':''}${ac?`<span class="badge" style="background:#5a1d1d">⛔ ${ac} chiusura/e</span>`:''}${(r.closures||[]).length>ac?`<span class="badge">🚧 ${(r.closures||[]).length-ac} avvisi strada</span>`:''}</div></div></div>`;});
   h+=`<div class="mut">Punteggio di guida 0–100: tiene conto di pioggia, raffiche, freddo/caldo percepito in sella, visibilità, ghiaccio e sole basso. Tocca un percorso per selezionarlo.</div></div>`;
+  {const r0=S.routes[S.sel],sg=riskSegs(r0,S.ev[S.sel]);S.riskSegs=sg;
+    const sum=l=>{const x=sg.filter(q=>q.lvl===l);return x.length?`${x.length} tratt${x.length>1?'i':'o'} ${l===2?'🔴':'🟠'} (${Math.round(x.reduce((a,q)=>a+q.km1-q.km0,0))} km)`:'';};
+    h+=`<div class="card"><h3>⚠️ Tratti a rischio</h3>`+(sg.length?`<div class="mut" style="margin-bottom:6px"><b>${[sum(2),sum(1)].filter(Boolean).join(' · ')}</b></div>`+
+      sg.map((q,k)=>`<div class="sv" data-risk="${k}" style="cursor:pointer;border-left:5px solid ${RISKCOL[q.lvl]};padding-left:8px"><div class="n"><b>${q.lvl===2?'🔴':'🟠'} km ${Math.round(q.km0)}–${Math.round(q.km1)}</b> <span class="mut">· ${fmtT(q.t0)}${Math.round((q.t1-q.t0)/60000)>2?'–'+fmtT(q.t1):''}</span><div class="mut">${[...q.why.values()].map(esc).join(' · ')}</div></div><span class="mut">›</span></div>`).join(''):
+      '<div class="empty" style="padding:8px">✅ Nessun tratto a rischio con il meteo previsto.</div>')+
+      `<div class="note" style="margin-top:6px">Legenda strada: <b style="color:#1e9bff">azzurro</b> = ok · <b style="color:#ff9500">arancione</b> = sconsigliato (freddo in sella, pioviggine, vento, comfort basso) · <b style="color:#e60000">rosso</b> = pericolo (ghiaccio, neve, temporale, pioggia forte, raffiche, nebbia). Tocca un tratto per centrarlo sulla mappa, o tocca la strada per il dettaglio.</div></div>`;}
   const r=S.routes[S.sel];
   const bt=bestTimes(r);
   if(bt.length){const b=bt.reduce((x,y)=>y.score>x.score?y:x);const cur=S.ev[S.sel].score;
@@ -890,6 +942,10 @@ function renderRoutes(){
     <div class="mut">Google Maps ricostruisce il tragitto passando per 8 punti del percorso scelto; per seguirlo alla lettera usa l’export GPX (GPS Exchange Format) in un navigatore che lo supporta.</div></div>`;
   box.innerHTML=h;
   box.querySelectorAll('.rt').forEach(e=>e.onclick=()=>selectRoute(+e.dataset.i));
+  box.querySelectorAll('[data-risk]').forEach(e=>e.onclick=()=>{const q=S.riskSegs[+e.dataset.risk],r=S.routes[S.sel];if(!q||!r)return;const seg=r.coords.slice(q.ci0,q.ci1+2);
+    try{if(window._hl)window._hl.remove();window._hl=L.polyline(seg,{color:'#ffd400',weight:14,opacity:.6}).addTo(map);map.fitBounds(L.latLngBounds(seg).pad(0.4));setTimeout(()=>{try{window._hl.remove();}catch(x){}},8000);
+      const ev=S.ev[S.sel];const mid=ev.pts.slice(q.i0,q.end+1).reduce((a,b)=>riskOf(b).lvl>riskOf(a).lvl?b:a);L.popup().setLatLng(mid.p).setContent(riskPopup(mid)).openOn(map);}catch(x){}
+    window.scrollTo({top:0,behavior:'smooth'});});
   if($('#fuelRetry'))$('#fuelRetry').onclick=()=>fetchFuel();
   box.querySelectorAll('[data-fsearch]').forEach(e=>e.onclick=ev=>{ev.preventDefault();const v=e.dataset.fsearch;if(v==='route'){const c=map.getCenter();fuelSearchAt(c.lat,c.lng,'plan');}else{const [a,b]=v.split(',').map(Number);fuelSearchAt(a,b,'plan');}});
   bindProposal();
@@ -1324,7 +1380,7 @@ $('#gmGo').onclick=async()=>{
 $('#stops').addEventListener('input',()=>{if(S.mode==='gpx'){S.mode='route';S.routes=[];}});
 
 /* ================= tab ================= */
-function showTab(t){if(t==='disc'){renderDisc();if(S.routes.length&&DISC.state!=='loading'&&DISC.sig!==routeSig())discSearch();}document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));document.querySelectorAll('.tab').forEach(s=>s.classList.toggle('on',s.id==='tab-'+t));}
+function showTab(t){if(t==='disc'){renderDisc();}document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));document.querySelectorAll('.tab').forEach(s=>s.classList.toggle('on',s.id==='tab-'+t));}
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{showTab(b.dataset.tab);if(b.dataset.tab==='saved')renderSaved();});
 
 /* ================= impostazioni ================= */
@@ -1666,8 +1722,8 @@ function navDraw(){
   if(!NAV.mapI||!NAV.layers)return;NAV.layers.clearLayers();
   L.polyline(NAV.coords,{color:'#0b3d6e',weight:11,opacity:.35}).addTo(NAV.layers);
   L.polyline(NAV.coords,{color:'#1e9bff',weight:7}).addTo(NAV.layers);
-  try{const ev=S.ev[S.sel];if(ev)ev.pts.forEach((p,i)=>{const nx=ev.pts[i+1];if(!nx||!(isDanger(p)||isDanger(nx)))return;
-    const a=navProj(p.p,0,NAV.coords.length),b=navProj(nx.p,0,NAV.coords.length);if(a.d<300&&b.d<300&&b.i>a.i)L.polyline(NAV.coords.slice(a.i,b.i+2),{color:'#e60000',weight:8}).addTo(NAV.layers);});
+  try{const ev=S.ev[S.sel];if(ev)ev.pts.forEach((p,i)=>{const nx=ev.pts[i+1];if(!nx)return;const lvl=Math.max(riskOf(p).lvl,riskOf(nx).lvl);if(!lvl)return;
+    const a=navProj(p.p,0,NAV.coords.length),b=navProj(nx.p,0,NAV.coords.length);if(a.d<300&&b.d<300&&b.i>a.i)L.polyline(NAV.coords.slice(a.i,b.i+2),{color:RISKCOL[lvl],weight:8}).addTo(NAV.layers);});
     (S.routes[S.sel]&&S.routes[S.sel].closures||[]).filter(c=>c.active).forEach(c=>L.marker(c.p,{icon:L.divIcon({className:'',html:'<div class="wxi">⛔</div>',iconSize:[22,22],iconAnchor:[11,11]})}).addTo(NAV.layers));
     const fp=fuelPlan(S.routes[S.sel]);fp.stops.forEach(x=>{if(!x.synthetic)L.circleMarker(x.p,{radius:9,color:'#111',weight:2,fillColor:'#e60000',fillOpacity:1}).bindTooltip('⛽ '+x.name).addTo(NAV.layers);
       if(x.backup)L.circleMarker(x.backup.p,{radius:8,color:'#111',weight:2,fillColor:'#29b6ff',fillOpacity:1}).bindTooltip('⛽ riserva '+x.backup.name).addTo(NAV.layers);});}catch(e){}
@@ -1867,7 +1923,8 @@ const POI_CATS=[
   {k:'passo',ic:'🏔️',n:'Passi di montagna',s:'Passo di montagna'},{k:'spa',ic:'💆',n:'SPA',s:'SPA'},{k:'agrispa',ic:'🌾💆',n:'Agriturismi con SPA',s:'Agriturismo con SPA'}];
 const FOOD_CATS=['trattoria','osteria','ristorante','agriturismo','agrispa','rifugio'];
 const DISC={items:[],state:'idle',sig:'',layer:null,
-  cats:LS.get('motorotta_disc_cats',POI_CATS.map(c=>c.k)),radius:LS.get('motorotta_disc_r',5)};
+  cats:LS.get('motorotta_disc_cats',['ristorante','agriturismo']),radius:LS.get('motorotta_disc_r',5),where:'route',sr:LS.get('motorotta_disc_sr',10),pick:false};
+const discStops=()=>S.stops.map((x,i)=>({i,x})).filter(o=>o.x.p).map(o=>({i:o.i,lab:o.i===0?'P':o.i===S.stops.length-1?'🏁':String(o.i),name:(o.x.p.name||o.x.text||'').split(',')[0],p:[o.x.p.lat,o.x.p.lon]}));
 const RATE_KEY='motorotta_poi_rates';
 const SEL_KEY='motorotta_poi_sel';const sels=()=>LS.get(SEL_KEY,{});
 function toggleSel(i){const all=sels();if(all[i.key])delete all[i.key];else all[i.key]={name:i.name,cat:i.cat,p:[+i.p[0].toFixed(5),+i.p[1].toFixed(5)],tel:i.t.phone||i.t['contact:phone']||'',oh:i.t.opening_hours||'',ele:i.t.ele||'',t:Date.now()};LS.set(SEL_KEY,all);}
@@ -1902,8 +1959,8 @@ function classify(t){
   else if(hasSpa)out.push('spa');
   return out;
 }
-function poiQuery(line,R){
-  const Rf=Math.min(R,5000);
+function poiQuery(line,R,full){
+  const Rf=full?R:Math.min(R,5000);
   const a=`(around:${R},${line})`,af=`(around:${Rf},${line})`;
   const want=new Set(DISC.cats);const q=[];
   if(want.has('eremo')||want.has('abbazia')){q.push(`nwr${a}["amenity"="monastery"];`,`nwr${a}["historic"="monastery"];`,`nwr${a}["name"~"^(Eremo|Abbazia|Badia|Certosa)",i];`);}
@@ -1920,9 +1977,20 @@ function poiQuery(line,R){
   return `[out:json][timeout:60];${hut}(\n${q.join('\n')}${hut?'\n.hok;':''}\n);out tags center 2500;`;
 }
 async function discSearch(){
-  const r=S.routes[S.sel];if(!r){toast('Calcola prima un percorso');return;}
+  const r=S.routes[S.sel];
   if(!DISC.cats.length){toast('Scegli almeno una categoria');return;}
-  DISC.state='loading';renderDisc();
+  if(DISC.where!=='route'){const st=discStops().find(o=>o.i===DISC.where);if(!st){DISC.where='route';toast('Tappa non trovata: scegline un’altra');renderDisc();return;}
+    DISC.state='loading';renderDisc();
+    try{const R=DISC.sr*1000;const j=await overpass(poiQuery(st.p[0].toFixed(5)+','+st.p[1].toFixed(5),R,true));const items=[],seen=new Set();
+      (j.elements||[]).forEach(e=>{const t=e.tags||{};const lat=e.lat??(e.center&&e.center.lat),lon=e.lon??(e.center&&e.center.lon);if(lat==null)return;
+        const cats=classify(t).filter(c=>DISC.cats.includes(c));if(!cats.length)return;const key=e.type[0]+e.id;if(seen.has(key))return;seen.add(key);
+        const p=[lat,lon];const d=hav(st.p,p);if(d>R*1.05)return;items.push({key,cat:cats[0],p,name:t.name||t['name:it']||catOf(cats[0]).s,t,km:r?projKm(r,p).km:0,off:d,seg:0,near:st.name});});
+      const spas=items.filter(i=>i.cat==='spa');items.forEach(i=>{if(i.cat==='agriturismo'&&spas.some(s=>hav(s.p,i.p)<150)&&DISC.cats.includes('agrispa'))i.cat='agrispa';});
+      DISC.items=items.sort((a,b)=>a.off-b.off).slice(0,200);DISC.around=st;DISC.state='done';DISC.sig=routeSig();
+    }catch(e){console.warn(e);DISC.state='error';toast('Ricerca non riuscita: riprova tra poco');}
+    renderDisc();drawDiscLayer();return;}
+  if(!r){toast('Calcola prima un percorso, oppure scegli una tappa');return;}
+  DISC.around=null;DISC.state='loading';renderDisc();
   try{
     const R=DISC.radius*1000;const n=Math.min(400,Math.max(15,Math.round(r.len/(R*0.8))));
     const line=Array.from({length:n+1},(_,k)=>pointAtKm(r,r.len/1000*k/n)).map(p=>p[0].toFixed(5)+','+p[1].toFixed(5)).join(',');
@@ -1952,7 +2020,7 @@ async function discSearch(){
   }catch(e){console.warn(e);DISC.state='error';toast('Ricerca non riuscita: riprova tra poco');}
   renderDisc();drawDiscLayer();
 }
-const routeSig=()=>{const r=S.routes[S.sel];return r?(r.len|0)+'|'+S.sel+'|'+DISC.radius+'|'+DISC.cats.join(','):'';};
+const routeSig=()=>{const r=S.routes[S.sel];return (r?(r.len|0)+'|'+S.sel:'')+'|'+DISC.where+'|'+DISC.sr+'|'+DISC.radius+'|'+DISC.cats.join(',');};
 let selLayer=null;
 function drawSelLayer(){try{if(!selLayer)selLayer=L.layerGroup().addTo(map);selLayer.clearLayers();
   Object.entries(sels()).forEach(([k,v])=>L.marker(v.p,{icon:L.divIcon({className:'',html:`<div style="background:#fff;border:2px solid #f26b00;border-radius:12px;padding:1px 4px;font-size:15px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.4)">📌${catOf(v.cat).ic}</div>`,iconSize:[44,24],iconAnchor:[22,12]})})
@@ -1970,29 +2038,39 @@ function rateBadge(rt){if(!rt)return '';const f=rt.food?'🍴'+rt.food:'',sv=rt.
 function renderDisc(){
   const box=$('#tab-disc');if(!box)return;const r=S.routes[S.sel];
   const chips=POI_CATS.map(c=>`<button class="chip ${DISC.cats.includes(c.k)?'on':''}" data-k="${c.k}">${c.ic} ${c.n}</button>`).join('');
-  let h=`<div class="card"><h3>🔎 Scopri lungo il percorso</h3><div class="chips">${chips}</div>
-    <div class="row" style="margin-top:8px;align-items:center"><span class="mut">Distanza dal percorso</span>
-      <select id="discR" style="width:auto;flex:1">${[2,5,10].map(k=>`<option value="${k}" ${DISC.radius===k?'selected':''}>entro ${k} km</option>`).join('')}</select></div>
-    <button id="discGo" class="primary">${DISC.state==='loading'?'⏳ Cerco…':'Cerca lungo il percorso'}</button>
-    <div class="note" style="margin-top:6px">Dati da OpenStreetMap: indirizzi, telefoni e orari non sono sempre presenti. Voti e prezzi: i tuoi personali (e quelli degli amici che condividono il percorso) + link alle recensioni su Google Maps. Ristoranti, trattorie e osterie: entro max 5 km.</div></div>`;
-  if(!r)h+='<div class="card empty">Calcola prima un percorso.</div>';
+  const sts=discStops();if(DISC.where!=='route'&&!sts.some(o=>o.i===DISC.where))DISC.where='route';const cur=sts.find(o=>o.i===DISC.where);
+  let h=`<div class="card"><h3>🔎 Scopri</h3><div class="mut" style="margin-bottom:4px">1. Scegli cosa cercare</div><div class="chips">${chips}</div>
+    <div class="mut" style="margin:10px 0 4px">2. Scegli dove cercare</div>
+    <select id="discW">${'<option value="route"'+(DISC.where==='route'?' selected':'')+'>🛣️ Tutto il percorso (più lento)</option>'+sts.map(o=>`<option value="${o.i}" ${DISC.where===o.i?'selected':''}>📍 Tappa ${o.lab} · ${esc(o.name)}</option>`).join('')}</select>
+    <button id="discPick" class="${DISC.pick?'okb':''}" style="margin-top:6px;width:100%">${DISC.pick?'👆 Tocca il numero della tappa sulla mappa… (annulla)':'👆 Scegli la tappa toccandola sulla mappa'}</button>
+    <div class="row" style="margin-top:8px;align-items:center"><span class="mut">${DISC.where==='route'?'Distanza dal percorso':'Raggio intorno alla tappa'}</span>
+      ${DISC.where==='route'?`<select id="discR" style="width:auto;flex:1">${[2,5,10].map(k=>`<option value="${k}" ${DISC.radius===k?'selected':''}>entro ${k} km</option>`).join('')}</select>`
+        :`<select id="discSR" style="width:auto;flex:1">${[5,10,20].map(k=>`<option value="${k}" ${DISC.sr===k?'selected':''}>entro ${k} km</option>`).join('')}</select>`}</div>
+    <button id="discGo" class="primary">${DISC.state==='loading'?'⏳ Cerco…':cur?'3. Cerca intorno a '+esc(cur.name):'3. Cerca lungo il percorso'}</button>
+    <div class="note" style="margin-top:6px">Dati da OpenStreetMap: indirizzi, telefoni e orari non sono sempre presenti. Voti e prezzi: i tuoi personali (e quelli degli amici che condividono il percorso) + link alle recensioni su Google Maps. ${DISC.where==='route'?'Ristoranti, trattorie e osterie: entro max 5 km dal percorso.':'Cercare intorno a una tappa è molto più veloce che su tutto il percorso.'}</div></div>`;
+  if(!r&&DISC.where==='route')h+='<div class="card empty">Calcola prima un percorso, oppure scegli una tappa.</div>';
+  else if(DISC.state==='error')h+='<div class="card empty">Ricerca non riuscita (server dei dati lento): riprova tra poco o riduci il raggio.</div>';
+  else if(DISC.state==='done'&&DISC.sig!==routeSig())h+='<div class="card empty">Filtri cambiati: premi “Cerca”.</div>';
   else if(DISC.state==='done'){
     if(!DISC.items.length)h+='<div class="card empty">Nessun luogo trovato con questi filtri.</div>';
     else{
       const st=DISC.stopsKm||[];const groups={};DISC.items.forEach(i=>(groups[i.seg]=groups[i.seg]||[]).push(i));
       Object.keys(groups).sort((a,b)=>a-b).forEach(g=>{
         const a=st[+g],b=st[+g+1];
-        h+=`<div class="card"><h3>${a&&b?esc(a.name)+' → '+esc(b.name):'Lungo il percorso'}</h3>`+groups[g].sort((x,y)=>x.km-y.km).map(i=>{
+        h+=`<div class="card"><h3>${DISC.around?'📍 Intorno a '+esc(DISC.around.name)+' (entro '+DISC.sr+' km) · '+DISC.items.length+' luoghi':a&&b?esc(a.name)+' → '+esc(b.name):'Lungo il percorso'}</h3>`+groups[g].sort((x,y)=>x.km-y.km).map(i=>{
           const c=catOf(i.cat),rt=rates()[i.key];
           return `<div class="sv" data-poi="${i.key}" style="cursor:pointer"><div style="font-size:22px;width:30px;text-align:center">${c.ic}</div><div class="n"><b>${esc(i.name)}</b> ${rateBadge(rt)}
-            <div class="mut">${c.s}${i.t.ele?' · '+Math.round(parseFloat(i.t.ele))+' m s.l.m.':''} · km ${Math.round(i.km)}${i.near?' · vicino a '+esc(i.near):''} · ${i.off<1000?Math.round(i.off)+' m':(i.off/1000).toFixed(1)+' km'} dal percorso${closedDays(i.t.opening_hours)?' · chiuso '+closedDays(i.t.opening_hours):''}</div></div><span class="mut">›</span></div>`;}).join('')+'</div>';
+            <div class="mut">${c.s}${i.t.ele?' · '+Math.round(parseFloat(i.t.ele))+' m s.l.m.':''} · km ${Math.round(i.km)}${i.near?' · vicino a '+esc(i.near):''} · ${i.off<1000?Math.round(i.off)+' m':(i.off/1000).toFixed(1)+' km'} ${DISC.around?'da '+esc(DISC.around.name):'dal percorso'}${closedDays(i.t.opening_hours)?' · chiuso '+closedDays(i.t.opening_hours):''}</div></div><span class="mut">›</span></div>`;}).join('')+'</div>';
       });
     }
   }
   box.innerHTML=h;
-  box.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{const k=b.dataset.k;DISC.cats=DISC.cats.includes(k)?DISC.cats.filter(x=>x!==k):[...DISC.cats,k];LS.set('motorotta_disc_cats',DISC.cats);b.classList.toggle('on');});
-  $('#discR').onchange=e=>{DISC.radius=+e.target.value;LS.set('motorotta_disc_r',DISC.radius);};
+  box.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{const k=b.dataset.k;DISC.cats=DISC.cats.includes(k)?DISC.cats.filter(x=>x!==k):[...DISC.cats,k];LS.set('motorotta_disc_cats',DISC.cats);renderDisc();});
+  if($('#discR'))$('#discR').onchange=e=>{DISC.radius=+e.target.value;LS.set('motorotta_disc_r',DISC.radius);renderDisc();};
   $('#discGo').onclick=()=>{if(DISC.state!=='loading')discSearch();};
+  $('#discW').onchange=e=>{DISC.where=e.target.value==='route'?'route':+e.target.value;DISC.pick=false;renderDisc();drawStopMarkers();};
+  $('#discPick').onclick=()=>{DISC.pick=!DISC.pick;renderDisc();if(DISC.pick){toast('Tocca il numero di una tappa sulla mappa');window.scrollTo({top:0,behavior:'smooth'});}};
+  if($('#discSR'))$('#discSR').onchange=e=>{DISC.sr=+e.target.value;LS.set('motorotta_disc_sr',DISC.sr);renderDisc();};
   box.querySelectorAll('[data-poi]').forEach(e=>e.onclick=()=>openPoi(e.dataset.poi));
 }
 function drawDiscLayer(){
