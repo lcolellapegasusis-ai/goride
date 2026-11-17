@@ -23,7 +23,10 @@ html,body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 -apple-sys
 header{display:flex;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top) + 8px) 14px 8px;background:var(--head);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:1000}
 .brand{font-weight:700;font-size:17px}.brand span{color:var(--acc)}
 #status{font-size:12px;color:var(--mut);max-width:60%;text-align:right}
-#map{height:42vh;min-height:260px;background:#e6e9ef}
+.pslab{font:700 11px/1.1 -apple-system,system-ui,sans-serif;color:#111;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 2px #fff;white-space:nowrap;text-align:center;pointer-events:none}
+.psctl{background:#fff;border:2px solid rgba(0,0,0,.25);border-radius:10px;width:40px;height:40px;font-size:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 1px 5px rgba(0,0,0,.3)}
+.psctl.on{background:#1fa855;border-color:#fff}#map{height:42vh;
+min-height:260px;background:#e6e9ef}
 main{padding:10px 10px calc(env(safe-area-inset-bottom) + 30px);max-width:760px;margin:0 auto}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px}
 .stop{display:flex;align-items:center;gap:8px;margin-bottom:8px}
@@ -194,7 +197,7 @@ select{width:100%;background:var(--inp);color:var(--tx);border:1px solid var(--l
 
   <div class="foot">
     Mappe © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · Percorsi: Valhalla (profilo moto, server FOSSGIS) e OSRM (Open Source Routing Machine) · Ricerca luoghi: Photon · Meteo: <a href="https://open-meteo.com/">Open-Meteo</a> (modelli ECMWF/ICON/GFS).<br>
-    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">Versione 15 nov 2026 · rilascio 11 (soste tra 150 e 200 km, distributori ufficiali MIMIT)</b>
+    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">Versione 17 nov 2026 · rilascio 12 (passi e valichi sulla mappa)</b>
   </div>
 </main>
 </div>
@@ -805,7 +808,7 @@ function bindProposal(){
 }
 
 /* ================= rendering ================= */
-function renderAll(fit){setTimeout(()=>{drawSelLayer();renderSelCard();},0);
+function renderAll(fit){try{PLAN_PASS&&(PLAN_PASS.sig='',PLAN_PASS.refresh());}catch(e){}setTimeout(()=>{drawSelLayer();renderSelCard();},0);
   S.ev=S.routes.map(r=>evalRoute(r,S.dep));
   const curvMax=Math.max(...S.routes.map(r=>r.curv));
   const nMax=S.routes.filter(r=>r.curv>=curvMax-1).length;
@@ -1179,6 +1182,10 @@ const PASS_AREAS=[['route','Lungo il percorso calcolato (entro 30 km)'],['near',
 const PASSC={};
 async function loadPasses(area){
   if(PASSC[area])return PASSC[area];
+  const db=area.length===5&&area.includes('-')?null:await loadPassDB();
+  if(db){let out;if(area==='route'){const r=S.routes[S.sel];if(!r)throw new Error('calcola prima un percorso');const bb=L.latLngBounds(r.coords).pad(0.05);const la=0.3,lo=0.4;out=db.filter(x=>x.p[0]>bb.getSouth()-la&&x.p[0]<bb.getNorth()+la&&x.p[1]>bb.getWest()-lo&&x.p[1]<bb.getEast()+lo&&projKm(r,x.p).d<30000);}
+    else if(area==='near'){const c=map.getCenter();out=db.filter(x=>hav([c.lat,c.lng],x.p)<80000);}else out=db.filter(x=>x.cc===area);
+    if(out.length||area==='route'||area==='near'){PASSC[area]=out;return out;}}
   const road='["highway"~"^(motorway|trunk|primary|secondary|tertiary|unclassified|residential)$"]';
   let src;
   if(area==='route'){const r=S.routes[S.sel];if(!r)throw new Error('calcola prima un percorso');const n=Math.min(200,Math.max(10,Math.round(r.len/20000)));
@@ -1213,12 +1220,71 @@ function openPasses(){
     $('#psList').querySelectorAll('[data-ps]').forEach(e=>e.onclick=()=>{const x=L1.find(y=>y.key===e.dataset.ps);
       const i=bestInsert(x.p);S.stops.splice(i,0,{p:{lat:x.p[0],lon:x.p[1],name:x.name+(x.ele?' ('+Math.round(x.ele)+' m)':'')},text:x.name});
       renderStops();sh.classList.remove('on');try{map.setView(x.p,11);}catch(err){}toast('🏔️ '+x.name+' aggiunto come tappa: ricalcola il percorso');window.scrollTo({top:0,behavior:'smooth'});});};
-  const load=async()=>{const a=$('#psArea').value;LS.set('motorotta_pass_area',a);$('#psList').innerHTML='<div class="empty">⏳ Carico i passi…</div>';
+  const load=async()=>{const a=$('#psArea').value;if(a==='route'||a==='near')delete PASSC[a];LS.set('motorotta_pass_area',a);$('#psList').innerHTML='<div class="empty">⏳ Carico i passi…</div>';
     try{await loadPasses(a);draw();}catch(e){$('#psList').innerHTML=`<div class="empty">Non riesco a caricare i passi (${esc(e.message||'rete')}). Riprova.</div>`;}};
   $('#psArea').onchange=load;$('#psQ').oninput=draw;$('#psSort').onchange=draw;load();
 }
 $('#passBtn').onclick=openPasses;
 $('#tapBtn').onclick=()=>setTapMode(!S.tapMode);
+
+/* ================= livello passi e valichi sulla mappa ================= */
+let PASSDB=null,PASSDB_TRY=0;const PASSWX={},ONR=new WeakMap();
+async function loadPassDB(){
+  if(PASSDB)return PASSDB;if(Date.now()-PASSDB_TRY<300000)return null;PASSDB_TRY=Date.now();
+  try{const r=await fetch('data/passes.json',{cache:'no-cache'});if(!r.ok)return null;const j=await r.json();
+    PASSDB=j.p.map((x,i)=>({p:[x[0],x[1]],name:x[2],ele:x[3]||null,cc:x[4]||'',key:'d'+i}));return PASSDB;}catch(e){return null;}
+}
+async function passesInView(m){
+  const b=m.getBounds().pad(0.1);const db=await loadPassDB();
+  if(db)return db.filter(x=>b.contains(x.p));
+  // senza elenco locale: cerco intorno al centro (cache)
+  const c=m.getCenter();const k='near:'+c.lat.toFixed(1)+','+c.lng.toFixed(1);
+  if(!PASSC[k]){const q=`[out:json][timeout:60];node(around:80000,${c.lat.toFixed(4)},${c.lng.toFixed(4)})["mountain_pass"="yes"]->.p;way(bn.p)["highway"~"^(motorway|trunk|primary|secondary|tertiary|unclassified|residential)$"]->.w;node.p(w.w)["name"];out body 1500;`;
+    try{const j=await overpass(q);PASSC[k]=(j.elements||[]).map(e=>({name:e.tags.name,ele:parseFloat(e.tags.ele)||null,p:[e.lat,e.lon],key:'n'+e.id}));}catch(e){PASSC[k]=[];}}
+  return PASSC[k].filter(x=>b.contains(x.p));
+}
+async function passWeather(list){
+  const now=Date.now(),need=list.filter(x=>!PASSWX[x.key]||now-PASSWX[x.key].t>3600000).slice(0,150);
+  for(let i=0;i<need.length;i+=50){const ch=need.slice(i,i+50);
+    try{const url=`https://api.open-meteo.com/v1/forecast?latitude=${ch.map(x=>x.p[0].toFixed(3)).join(',')}&longitude=${ch.map(x=>x.p[1].toFixed(3)).join(',')}${ch.every(x=>x.ele)?'&elevation='+ch.map(x=>Math.round(x.ele)).join(','):''}&hourly=temperature_2m,snowfall,snow_depth&forecast_hours=24&timezone=GMT`;
+      const r=await fetch(url);if(!r.ok)continue;let j=await r.json();if(!Array.isArray(j))j=[j];
+      j.forEach((w,k)=>{const h=w.hourly||{};const tmin=Math.min(...(h.temperature_2m||[99]));const sf=(h.snowfall||[]).reduce((a,b)=>a+(b||0),0);const sd=Math.max(0,...(h.snow_depth||[0]).map(v=>v||0));
+        PASSWX[ch[k].key]={t:now,tmin,sf,sd,bad:tmin<=0||sf>0||sd>0.01};});
+    }catch(e){}}
+}
+function passIcon(x,onRoute,showLab){
+  const w=PASSWX[x.key];const col=!w?'#9aa0a6':w.bad?'#e60000':'#1fa855';const sz=onRoute?30:20,bc=onRoute?'#ff7a1a':'#fff',bw=onRoute?3:2;
+  const svg=`<svg width="${sz}" height="${sz}" viewBox="0 0 24 24" style="filter:drop-shadow(0 1px 2px rgba(0,0,0,.6))"><polygon points="12,2.5 22.5,21 1.5,21" fill="${col}" stroke="${bc}" stroke-width="${bw}" stroke-linejoin="round"/></svg>`;
+  const lab=showLab?`<div class="pslab">${esc(x.name)}${x.ele?' '+Math.round(x.ele)+' m':''}</div>`:'';
+  return L.divIcon({className:'',html:`<div style="display:flex;flex-direction:column;align-items:center;width:140px;margin-left:${-70+sz/2}px;pointer-events:none"><div style="pointer-events:auto;line-height:0">${svg}</div>${lab}</div>`,iconSize:[sz,sz],iconAnchor:[sz/2,sz-2]});
+}
+function passPopup(x){const w=PASSWX[x.key];
+  const wx=!w?'Meteo non disponibile':`${w.bad?'🔴':'🟢'} Prossime 24 h: minima ${Math.round(w.tmin)}°C${w.sf>0?' · neve prevista '+w.sf.toFixed(1)+' cm':''}${w.sd>0.01?' · neve al suolo '+Math.round(w.sd*100)+' cm':''}${w.bad?'':' · niente neve né gelo'}`;
+  return `<b>🏔️ ${esc(x.name)}</b><br>${x.ele?Math.round(x.ele)+' m s.l.m.':'quota n.d.'}<br><span style="font-size:12px">${wx}</span><br><span style="font-size:11px;color:#666">Lo stato di apertura/chiusura del passo non è disponibile gratuitamente: verifica prima di partire.</span><br><button class="okb" style="margin-top:6px;padding:6px 10px" data-addpass="${x.key}">➕ Aggiungi come tappa</button>`;}
+function addPassStop(x,ctx){const stop={p:{lat:x.p[0],lon:x.p[1],name:'🏔️ '+x.name+(x.ele?' ('+Math.round(x.ele)+' m)':'')},text:x.name};
+  if(ctx==='nav'&&NAV.active)navInsertStop(stop,x.name);
+  else{const i=bestInsert(x.p);S.stops.splice(i,0,stop);renderStops();toast('🏔️ '+x.name+' aggiunto come tappa: ricalcolo il percorso');calc();}}
+function makePassLayer(m,ctx,routeFn){
+  const P={m,ctx,on:LS.get('motorotta_pass_layer',true),layer:L.layerGroup(),t:null,seq:0};
+  const draw=async()=>{const my=++P.seq;if(!P.on)return;if(m.getZoom()<7){P.layer.clearLayers();P.sig='';return;}
+    let list=await passesInView(m);if(my!==P.seq)return;
+    const r=routeFn();let cache=r&&r.coords?ONR.get(r.coords):null;if(r&&r.coords&&!cache){cache=new Map();ONR.set(r.coords,cache);}
+    const onR=x=>{if(!r||!r.coords||!r.coords.length)return false;if(cache.has(x.key))return cache.get(x.key);let v=false;try{v=projKm(r,x.p).d<400;}catch(e){}cache.set(x.key,v);return v;};
+    list.forEach(x=>x._on=onR(x));list.sort((a,b)=>(b._on-a._on)||((b.ele||0)-(a.ele||0)));list=list.slice(0,250);
+    const paint=()=>{if(my!==P.seq)return;const z=m.getZoom();const sig=(z>=10)+'|'+list.map(x=>x.key+(x._on?'*':'')+(PASSWX[x.key]?PASSWX[x.key].bad?'r':'g':'n')).join(',');if(sig===P.sig&&P.layer.getLayers().length)return;P.sig=sig;P.layer.clearLayers();
+      list.forEach(x=>{const mk=L.marker(x.p,{icon:passIcon(x,x._on,x._on||z>=10),zIndexOffset:x._on?500:0});
+        mk.bindPopup(()=>passPopup(x));mk.on('popupopen',ev=>{const b=ev.popup.getElement()&&ev.popup.getElement().querySelector('[data-addpass]');if(b)b.onclick=()=>{m.closePopup();addPassStop(x,P.ctx);};});
+        P.layer.addLayer(mk);});};
+    paint();await passWeather(list);paint();};
+  P.refresh=()=>{clearTimeout(P.t);P.t=setTimeout(draw,350);};
+  P.set=on=>{P.on=on;P.sig='';LS.set('motorotta_pass_layer',on);if(P.btn)P.btn.classList.toggle('on',on);if(on){P.layer.addTo(m);P.refresh();}else{P.layer.remove();}};
+  try{const Ctl=L.Control.extend({onAdd(){const d=L.DomUtil.create('div','psctl'+(P.on?' on':''));d.title='Passi e valichi';d.innerHTML='🏔️';
+      L.DomEvent.disableClickPropagation(d);d.onclick=()=>{P.set(!P.on);toast(P.on?'🏔️ Passi e valichi visibili':'Passi e valichi nascosti');};P.btn=d;return d;}});
+    new Ctl({position:'topright'}).addTo(m);}catch(e){}
+  if(P.on)P.layer.addTo(m);
+  m.on('moveend zoomend',P.refresh);P.refresh();return P;
+}
+let PLAN_PASS=null;try{PLAN_PASS=makePassLayer(map,'plan',()=>S.routes[S.sel]);}catch(e){console.warn(e);}
 
 /* ================= import da link Google Maps ================= */
 $('#gmBtn').onclick=()=>{const b=$('#gmBox');b.style.display=b.style.display==='none'?'block':'none';if(b.style.display==='block')$('#gmUrl').focus();};
@@ -1565,7 +1631,7 @@ function navMapInit(){
   if(NAV.mapI){NAV.mapI.remove();NAV.mapI=null;}
   try{NAV.mapI=L.map('nmap',{zoomControl:false,attributionControl:false,doubleClickZoom:false,rotate:true,touchRotate:false,rotateControl:false,bearing:0});
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(NAV.mapI);
-    NAV.layers=L.layerGroup().addTo(NAV.mapI);NAV.mapI.fitBounds(L.latLngBounds(NAV.coords),{padding:[20,20]});
+    NAV.layers=L.layerGroup().addTo(NAV.mapI);try{NAV.pass=makePassLayer(NAV.mapI,'nav',()=>({coords:NAV.coords,len:NAV.len}));}catch(e){}NAV.mapI.fitBounds(L.latLngBounds(NAV.coords),{padding:[20,20]});
     NAV.mapI.on('dblclick',e=>{if(NAV.follow){NAV.follow=false;NAV.mapI.setView(e.latlng,Math.min(19,(NAV.mapI.getZoom()||15)+2),{animate:true});
         $('#recenter').style.display='block';clearTimeout(NAV.backT);NAV.backT=setTimeout(navBack,5000);}else navBack();});
     NAV.mapI.on('dragstart',()=>{NAV.follow=false;$('#recenter').style.display='block';clearTimeout(NAV.backT);NAV.backT=setTimeout(navBack,5000);});
