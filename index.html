@@ -210,7 +210,7 @@ button,.file{font-size:16px!important;padding:12px 14px!important;min-height:46p
 
   <div class="foot">
     Mappe © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · Percorsi: Valhalla (profilo moto, server FOSSGIS) e OSRM (Open Source Routing Machine) · Ricerca luoghi: Photon · Meteo: <a href="https://open-meteo.com/">Open-Meteo</a> (modelli ECMWF/ICON/GFS).<br>
-    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">Versione 21 nov 2026 · rilascio 15</b>
+    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">Versione 21 nov 2026 · rilascio 16</b>
   </div>
 </main>
 </div>
@@ -884,8 +884,11 @@ try{const FCtl=L.Control.extend({onAdd(){const d=L.DomUtil.create('div','psctl'+
   L.DomEvent.disableClickPropagation(d);d.onclick=()=>{FUEL_ALL=!FUEL_ALL;LS.set('motorotta_fuel_all',FUEL_ALL);d.classList.toggle('on',FUEL_ALL);
     if(fuelAllLayer){if(FUEL_ALL)fuelAllLayer.addTo(map);else fuelAllLayer.remove();}toast(FUEL_ALL?'⛽ Tutti i distributori visibili':'⛽ Solo sosta (rossa) e riserva (azzurra)');};return d;}});
   new FCtl({position:'topright'}).addTo(map);}catch(e){}
-function addNearFuelCtl(m,ctx){try{const C=L.Control.extend({onAdd(){const d=L.DomUtil.create('div','psctl');d.title='Distributore vicino a me';d.style.background='#29b6ff';d.style.borderColor='#fff';d.innerHTML='⛽';
-    L.DomEvent.disableClickPropagation(d);d.onclick=async()=>{const p=await myPos();if(!p){locHelp({code:1});return;}fuelSearchAt(p[0],p[1],ctx);};return d;}});new C({position:'topright'}).addTo(m);}catch(e){}}
+const NEARBTN=[];
+function nearFuelOff(){try{if(fsLayer)fsLayer.clearLayers();if(fsLayerN)fsLayerN.clearLayers();}catch(e){}NEARBTN.forEach(d=>{d.style.boxShadow='';d.style.borderColor='#fff';d.dataset.on='';});}
+function addNearFuelCtl(m,ctx){try{const C=L.Control.extend({onAdd(){const d=L.DomUtil.create('div','psctl');d.title='Distributore vicino a me';d.style.background='#29b6ff';d.style.borderColor='#fff';d.innerHTML='⛽';NEARBTN.push(d);
+    L.DomEvent.disableClickPropagation(d);d.onclick=async()=>{if(d.dataset.on){nearFuelOff();$('#poiSheet').classList.remove('on');toast('Distributori vicini nascosti');return;}
+      const p=await myPos();if(!p){locHelp({code:1});return;}NEARBTN.forEach(b=>{b.dataset.on='1';b.style.borderColor='#003a5c';b.style.boxShadow='0 0 0 4px #ffd400';});fuelSearchAt(p[0],p[1],ctx);};return d;}});new C({position:'topright'}).addTo(m);}catch(e){}}
 addNearFuelCtl(map,'plan');
 function drawMap(fit){setTimeout(drawStopMarkers,0);
   layer.clearLayers();
@@ -1208,7 +1211,7 @@ $('#gpxIn').addEventListener('change',async e=>{
 function setStopsFrom(pts){S.mode='route';S.routes=[];S.stops=pts.map(p=>({p:{lat:p.lat,lon:p.lon,name:p.name},text:p.name}));renderStops();}
 
 /* ================= cerca distributori direttamente nell'app ================= */
-let fsLayer=null;
+let fsLayer=null,fsLayerN=null;
 async function fuelSearchAt(lat,lon,ctx){
   const sh=$('#poiSheet');sh.innerHTML=`<div class="sheet"><div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">⛽ Distributori vicini</h3><button id="fsX" class="ib">✕</button></div><div id="fsList"><div class="empty">⏳ Cerco i distributori…</div></div></div>`;
   sh.classList.add('on');$('#fsX').onclick=()=>sh.classList.remove('on');
@@ -1233,11 +1236,13 @@ async function fuelSearchAt(lat,lon,ctx){
   found.forEach(f=>{if(r){const pr=projKm(r,f.p);f.off=pr.d;f.km=pr.km;}});
   found.sort((a,b)=>ctx==='nav'?a.d-b.d:((a.off??a.d)-(b.off??b.d)));
   try{if(!fsLayer)fsLayer=L.layerGroup().addTo(map);fsLayer.clearLayers();
-    found.forEach(f=>L.marker(f.p,{icon:L.divIcon({className:'',html:'<div style="width:22px;height:22px;border-radius:50%;background:#fff;border:2px solid #e60000;display:flex;align-items:center;justify-content:center;font-size:12px">⛽</div>',iconSize:[22,22],iconAnchor:[11,11]})}).bindPopup('<b>'+esc(f.name)+'</b>').addTo(fsLayer));}catch(e){}
+    if(NAV.active&&NAV.mapI){if(!fsLayerN||fsLayerN._map!==NAV.mapI)fsLayerN=L.layerGroup().addTo(NAV.mapI);fsLayerN.clearLayers();
+      found.forEach(f=>L.marker(f.p,{icon:L.divIcon({className:'',html:'<div style="width:26px;height:26px;border-radius:50%;background:#9fe0ff;border:2px solid #0077b3;display:flex;align-items:center;justify-content:center;font-size:14px">⛽</div>',iconSize:[26,26],iconAnchor:[13,13]})}).bindTooltip(f.name).addTo(fsLayerN));}
+    found.forEach(f=>L.marker(f.p,{icon:L.divIcon({className:'',html:'<div style="width:26px;height:26px;border-radius:50%;background:#9fe0ff;border:2px solid #0077b3;display:flex;align-items:center;justify-content:center;font-size:12px">⛽</div>',iconSize:[26,26],iconAnchor:[13,13]})}).bindPopup('<b>'+esc(f.name)+'</b>').addTo(fsLayer));}catch(e){}
   $('#fsList').innerHTML=found.length?`<div class="mut" style="margin:6px 0">${fu.toUpperCase()} · tocca un distributore per inserirlo nel percorso come sosta${ctx==='nav'?' (diventa la prossima tappa)':''}.</div>`+found.slice(0,25).map((f,i)=>`<div class="sv" data-fs="${i}" style="cursor:pointer"><div style="font-size:20px">⛽</div><div class="n"><b>${esc(f.name)}</b>
       <div class="mut">${(f.d/1000).toFixed(1)} km da qui${f.off!=null?' · '+(f.off<1000?Math.round(f.off)+' m':(f.off/1000).toFixed(1)+' km')+' dal percorso':''}${f.h24?' · 24h/self':f.oh?' · '+esc(f.oh):''}${closedDays(f.oh)?' · chiuso '+closedDays(f.oh):''}</div></div><span style="color:var(--acc);font-weight:700">➕</span></div>`).join('')
     :'<div class="empty">Nessun distributore trovato entro 25 km.</div>';
-  $('#fsList').querySelectorAll('[data-fs]').forEach(e=>e.onclick=()=>{const f=found[+e.dataset.fs];sh.classList.remove('on');addFuelStop(f,ctx);});
+  $('#fsList').querySelectorAll('[data-fs]').forEach(e=>e.onclick=()=>{const f=found[+e.dataset.fs];sh.classList.remove('on');nearFuelOff();addFuelStop(f,ctx);});
 }
 async function navInsertStop(stop,label){
   const nxt=NAV.stops[NAV.next];if(!nxt||!NAV.me){toast('Posizione non disponibile');return;}
@@ -2619,7 +2624,7 @@ autoStart();
 if(location.hash.startsWith('#r')){try{applyPayload(b64d(location.hash.slice(2)));calc();}catch(e){console.warn(e);}}
 
 /* ================= aggiornamento automatico dell'app ================= */
-const APP_REL=15;
+const APP_REL=16;
 async function checkUpdate(){
   try{const r=await fetch('version.txt?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=parseInt((await r.text()).trim(),10);
     if(v>APP_REL){const k='motorotta_upd_try';if(LS.get(k,0)===v)return;LS.set(k,v);toast('⬇️ Nuova versione disponibile: aggiorno l’app…');
