@@ -153,6 +153,11 @@ body.bold,body.bold *{font-weight:700!important}
 #autosave{position:fixed;left:10px;right:10px;bottom:calc(env(safe-area-inset-bottom) + 84px);z-index:8000;background:#14181f;color:#fff;border:2px solid var(--acc);border-radius:14px;padding:12px;display:none;align-items:center;gap:10px;font-size:16px;font-weight:700}
 #autosave button{background:#d10000!important;color:#fff!important;border:0;font-weight:900;min-width:70px}
 details.howto{border-bottom:1px solid var(--line);padding:8px 0}details.howto summary{font-weight:800;font-size:16px;cursor:pointer;padding:4px 0}details.howto div{font-size:15px;line-height:1.5;padding:6px 0 4px}
+#m3d{position:absolute;left:0;top:0;right:0;height:58vh;min-height:320px;border-radius:12px;display:none;z-index:0;overflow:hidden}
+body.m3 #m3d{display:block}body.m3 #nmap{background:transparent!important;pointer-events:none;position:relative;z-index:1}
+body.m3 #nmap .leaflet-pane{visibility:hidden}body.m3 #nmap .leaflet-control{pointer-events:auto}
+.m3me{width:34px;height:34px}
+#nmap .leaflet-top{top:92px}#simBar{flex-wrap:wrap}#simBar button{padding:10px 12px!important}
 .sheet{background:var(--card);border-top:2px solid var(--acc);border-radius:18px 18px 0 0;padding:14px 14px calc(env(safe-area-inset-bottom) + 18px);width:100%;max-height:88vh;overflow:auto}
 .rrow{display:flex;align-items:center;justify-content:space-between;margin:6px 0}
 .stars span{font-size:26px;color:#555;padding:0 3px;cursor:pointer}
@@ -218,7 +223,7 @@ details.howto{border-bottom:1px solid var(--line);padding:8px 0}details.howto su
 
   <div class="foot">
     Mappe © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · Percorsi: Valhalla (profilo moto, server FOSSGIS) e OSRM (Open Source Routing Machine) · Ricerca luoghi: Photon · Meteo: <a href="https://open-meteo.com/">Open-Meteo</a> (modelli ECMWF/ICON/GFS).<br>
-    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">VERSIONE DI PROVA = rilascio 18</b>
+    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">VERSIONE DI PROVA · fase 4 mappa 3D (21 nov 2026)</b>
   </div>
 </main>
 </div>
@@ -1763,7 +1768,7 @@ async function startNav(resume){
   navUI(null);saveTrip();
 }
 function stopNav(silent){
-  if(!NAV.active)return;NAV.active=false;try{if(VC)VC.abort();}catch(e){}if(SIM.on){clearInterval(SIM.timer);SIM.on=false;const b=$('#simBar');if(b)b.style.display='none';}navAskClose();clearTrip();
+  if(!NAV.active)return;document.body.classList.remove('m3');NAV.active=false;try{if(VC)VC.abort();}catch(e){}if(SIM.on){clearInterval(SIM.timer);SIM.on=false;const b=$('#simBar');if(b)b.style.display='none';}navAskClose();clearTrip();
   let tollEur=0;try{const r=S.routes[S.sel];if(r&&r.tollKm)tollEur=r.tollKm*tollRate();}catch(e){}
   RD.navSummary={tollEur,reached:NAV.stops.slice(1).filter(s=>s.state==='done').map(s=>s.name),skipped:NAV.stops.filter(s=>s.state==='skipped').map(s=>s.name)};
   $('#navCard').style.display='none';navStartCardUI();
@@ -1773,7 +1778,7 @@ function navMapInit(){
   if(NAV.mapI){NAV.mapI.remove();NAV.mapI=null;}
   try{NAV.mapI=L.map('nmap',{zoomControl:false,attributionControl:false,doubleClickZoom:false,rotate:true,touchRotate:false,rotateControl:false,bearing:0});
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(NAV.mapI);
-    NAV.layers=L.layerGroup().addTo(NAV.mapI);addEmCtl(NAV.mapI);addNearFuelCtl(NAV.mapI,'nav');addMicCtl(NAV.mapI);setTimeout(vcontStart,3000);try{NAV.pass=makePassLayer(NAV.mapI,'nav',()=>({coords:NAV.coords,len:NAV.len}));}catch(e){}NAV.mapI.fitBounds(L.latLngBounds(NAV.coords),{padding:[20,20]});
+    NAV.layers=L.layerGroup().addTo(NAV.mapI);addEmCtl(NAV.mapI);addNearFuelCtl(NAV.mapI,'nav');addM3Ctl(NAV.mapI);addMicCtl(NAV.mapI);setTimeout(vcontStart,3000);if(M3.on)setTimeout(()=>m3Set(true),300);try{NAV.pass=makePassLayer(NAV.mapI,'nav',()=>({coords:NAV.coords,len:NAV.len}));}catch(e){}NAV.mapI.fitBounds(L.latLngBounds(NAV.coords),{padding:[20,20]});
     NAV.mapI.on('dblclick',e=>{if(NAV.follow){NAV.follow=false;NAV.mapI.setView(e.latlng,Math.min(19,(NAV.mapI.getZoom()||15)+2),{animate:true});
         $('#recenter').style.display='block';clearTimeout(NAV.backT);NAV.backT=setTimeout(navBack,5000);}else navBack();});
     NAV.mapI.on('dragstart',()=>{NAV.follow=false;$('#recenter').style.display='block';clearTimeout(NAV.backT);NAV.backT=setTimeout(navBack,5000);});
@@ -1781,7 +1786,7 @@ function navMapInit(){
   $('#recenter').onclick=navBack;
   navDraw();
 }
-function navBack(){clearTimeout(NAV.backT);NAV.follow=true;$('#recenter').style.display='none';if(NAV.me)navFollow(NAV.lastPr);}
+function navBack(){clearTimeout(NAV.backT);NAV.follow=true;$('#recenter').style.display='none';if(NAV.me){navFollow(NAV.lastPr);try{if(M3.on)m3Sync(NAV.lastPr);}catch(e){}}}
 function navHeading(i){const c=NAV.coords;if(!c.length)return 0;let j=i,d=0;while(j<c.length-1&&d<60){d+=hav(c[j],c[j+1]);j++;}return j>i?bearing(c[i],c[j]):0;}
 function navFollow(pr){
   if(!NAV.mapI||!NAV.follow||!NAV.me)return;
@@ -1895,6 +1900,7 @@ function navOnFix(pt,acc){
   NAV.lastI=pr.i;NAV.lastAlong=pr.along;NAV.lastPr=pr;
   const n=NAV.stops[NAV.next];
   try{if(NAV.mapI){navDraw();navFollow(pr);}}catch(e){}
+  try{if(M3.on)m3Sync(pr);}catch(e){}
   if(pr.d<120)navManeuver(pr);else $('#manBanner').classList.remove('on');
   if(Date.now()-(NAV.savedAt||0)>60000)saveTrip();
   if(!n){navUI(pr);return;}
@@ -2669,6 +2675,61 @@ function vcontStart(){if(!SET.vcont||!NAV.active||VC)return;const rc=vListen(tru
   rc.onerror=()=>{};rc.onend=()=>{VC=null;if(SET.vcont&&NAV.active)setTimeout(vcontStart,800);};try{rc.start();}catch(e){VC=null;}}
 function addMicCtl(m){try{const C=L.Control.extend({onAdd(){const d=L.DomUtil.create('div','psctl');d.title='Comando vocale';d.style.cssText+='width:62px!important;height:62px!important;font-size:32px!important;background:#111;border-color:#ff7a1a;border-width:3px';d.innerHTML='🎤';
     L.DomEvent.disableClickPropagation(d);d.onclick=()=>{unlockAudio();vOnce();};return d;}});new C({position:'bottomleft'}).addTo(m);}catch(e){}}
+
+/* ================= mappa 3D in navigazione (MapLibre, gratuita) ================= */
+const FEAT3D=/\/beta\//.test(location.pathname)||location.protocol==='file:';
+const M3={on:FEAT3D&&LS.get('motorotta_3d',false),map:null,ready:false,loading:null,cref:null,eref:null,me:null,btns:[]};
+const ML_V='4.7.1';
+function loadML(){if(window.maplibregl)return Promise.resolve();if(M3.loading)return M3.loading;
+  M3.loading=new Promise((res,rej)=>{const l=document.createElement('link');l.rel='stylesheet';l.href=`https://unpkg.com/maplibre-gl@${ML_V}/dist/maplibre-gl.css`;document.head.appendChild(l);
+    const sc=document.createElement('script');sc.src=`https://unpkg.com/maplibre-gl@${ML_V}/dist/maplibre-gl.js`;sc.onload=()=>res();sc.onerror=()=>{M3.loading=null;rej(new Error('rete'));};document.head.appendChild(sc);});
+  return M3.loading;}
+const ll=p=>[p[1],p[0]];
+async function m3Init(){await loadML();if(M3.map)return;
+  let d=$('#m3d');if(!d){d=document.createElement('div');d.id='m3d';$('#nmapWrap').insertBefore(d,$('#nmapWrap').firstChild);}
+  const c=NAV.me||NAV.coords[0]||[41.9,12.5];
+  M3.map=new maplibregl.Map({container:d,style:'https://tiles.openfreemap.org/styles/liberty',center:ll(c),zoom:15,pitch:60,bearing:0,maxPitch:75,attributionControl:false,fadeDuration:0});
+  M3.map.on('dragstart',()=>{NAV.follow=false;$('#recenter').style.display='block';clearTimeout(NAV.backT);NAV.backT=setTimeout(navBack,5000);});
+  M3.map.on('load',()=>{const m=M3.map;
+    try{m.addSource('dem',{type:'raster-dem',tiles:['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],encoding:'terrarium',tileSize:256,maxzoom:13});
+      m.setTerrain({source:'dem',exaggeration:1.4});
+      const firstSym=(m.getStyle().layers||[]).find(x=>x.type==='symbol');m.addLayer({id:'hill',type:'hillshade',source:'dem',paint:{'hillshade-exaggeration':0.35}},firstSym?firstSym.id:undefined);}catch(e){console.warn(e);}
+    m.addSource('rt',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+    m.addSource('rk',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+    m.addSource('pt',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+    m.addLayer({id:'rt-case',type:'line',source:'rt',layout:{'line-join':'round','line-cap':'round'},paint:{'line-color':'#0b3d6e','line-width':14,'line-opacity':.45}});
+    m.addLayer({id:'rt',type:'line',source:'rt',layout:{'line-join':'round','line-cap':'round'},paint:{'line-color':'#1e9bff','line-width':9}});
+    m.addLayer({id:'rk',type:'line',source:'rk',layout:{'line-join':'round','line-cap':'round'},paint:{'line-color':['get','col'],'line-width':10}});
+    m.addLayer({id:'pt',type:'circle',source:'pt',paint:{'circle-radius':['get','r'],'circle-color':['get','col'],'circle-stroke-color':'#111','circle-stroke-width':2,'circle-pitch-alignment':'map'}});
+    m.addLayer({id:'pt-lab',type:'symbol',source:'pt',layout:{'text-field':['get','lab'],'text-size':13,'text-offset':[0,1.6],'text-anchor':'top','text-optional':true},paint:{'text-color':'#111','text-halo-color':'#fff','text-halo-width':2}});
+    const el=document.createElement('div');el.className='m3me';el.innerHTML='<svg viewBox="0 0 34 34" width="34" height="34"><circle cx="17" cy="17" r="15" fill="#ff7a1a" stroke="#fff" stroke-width="3"/><path d="M17 6 L25 25 L17 20 L9 25 Z" fill="#fff"/></svg>';
+    M3.me=new maplibregl.Marker({element:el,rotationAlignment:'map',pitchAlignment:'map'}).setLngLat(ll(c)).addTo(m);
+    M3.ready=true;M3.cref=null;m3Sync(NAV.lastPr,true);});
+  M3.map.on('error',e=>console.warn('3D',e&&e.error));
+}
+function m3Data(){const m=M3.map;if(!m||!M3.ready)return;
+  m.getSource('rt').setData({type:'Feature',geometry:{type:'LineString',coordinates:NAV.coords.map(ll)}});
+  const rk=[];try{const ev=S.ev[S.sel];if(ev)ev.pts.forEach((p,i)=>{const nx=ev.pts[i+1];if(!nx)return;const lvl=Math.max(riskOf(p).lvl,riskOf(nx).lvl);if(!lvl)return;
+    const a=navProj(p.p,0,NAV.coords.length),b=navProj(nx.p,0,NAV.coords.length);if(a.d<300&&b.d<300&&b.i>a.i)rk.push({type:'Feature',properties:{col:RISKCOL[lvl]},geometry:{type:'LineString',coordinates:NAV.coords.slice(a.i,b.i+2).map(ll)}});});}catch(e){}
+  m.getSource('rk').setData({type:'FeatureCollection',features:rk});
+  const pts=[];const P=(p,col,r,lab)=>pts.push({type:'Feature',properties:{col,r,lab:lab||''},geometry:{type:'Point',coordinates:ll(p)}});
+  try{const fp=fuelPlan(S.routes[S.sel]);fp.stops.forEach(x=>{if(!x.synthetic)P(x.p,'#e60000',13,'⛽ '+x.name);if(x.backup)P(x.backup.p,'#29b6ff',10,'⛽ riserva');});}catch(e){}
+  NAV.stops.forEach((st,k)=>P([st.p.lat,st.p.lon],st.state==='done'?'#3ecf6e':st.state==='skipped'?'#777':k===NAV.next?'#ff7a1a':'#fff',k===NAV.next?10:8,st.name));
+  try{(S.routes[S.sel].closures||[]).filter(c=>c.active).forEach(c=>P(c.p,'#000',9,'⛔ chiusura'));}catch(e){}
+  m.getSource('pt').setData({type:'FeatureCollection',features:pts});
+  M3.cref=NAV.coords;M3.eref=S.ev[S.sel];}
+function m3Sync(pr,force){if(!M3.on||!M3.map||!M3.ready)return;
+  if(force||M3.cref!==NAV.coords||M3.eref!==S.ev[S.sel])m3Data();
+  if(NAV.me){M3.me.setLngLat(ll(NAV.me));const hd=pr?navHeading(pr.i):0;M3.me.setRotation(hd);
+    if(NAV.follow){let z=RD.v*3.6>90?15:16;const nm=pr?nextMan(pr):null;if(nm&&nm.dist<350)z=17.5;else if(nm&&nm.dist<800)z=16.5;
+      M3.map.easeTo({center:ll(NAV.me),bearing:hd,pitch:62,zoom:z,duration:900,padding:{top:Math.round(M3.map.getContainer().clientHeight*0.35)}});}}}
+async function m3Set(on){M3.on=on;LS.set('motorotta_3d',on);M3.btns.forEach(b=>{b.textContent=on?'2D':'3D';});
+  document.body.classList.toggle('m3',on);
+  if(on){toast('⏳ Carico la mappa 3D…');try{await m3Init();setTimeout(()=>{try{M3.map.resize();}catch(e){}m3Sync(NAV.lastPr,true);},200);toast('🗻 Vista 3D attiva');}
+    catch(e){toast('Mappa 3D non disponibile (rete): resto in 2D');M3.on=false;LS.set('motorotta_3d',false);document.body.classList.remove('m3');M3.btns.forEach(b=>b.textContent='3D');}}
+  else{try{NAV.mapI.invalidateSize();if(NAV.me)navFollow(NAV.lastPr);}catch(e){}toast('Vista 2D');}}
+function addM3Ctl(m){if(!FEAT3D)return;try{const C=L.Control.extend({onAdd(){const d=L.DomUtil.create('div','psctl');d.title='3D / 2D';d.style.cssText+='font-size:19px!important;font-weight:900;background:#111;color:#fff;border-color:#fff';d.textContent=M3.on?'2D':'3D';M3.btns.push(d);
+    L.DomEvent.disableClickPropagation(d);d.onclick=()=>m3Set(!M3.on);return d;}});new C({position:'topright'}).addTo(m);}catch(e){}}
 
 /* ================= giorni buoni per guidare ================= */
 let gdLoaded=0;
