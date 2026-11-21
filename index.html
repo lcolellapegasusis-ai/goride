@@ -210,7 +210,7 @@ button,.file{font-size:16px!important;padding:12px 14px!important;min-height:46p
 
   <div class="foot">
     Mappe © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · Percorsi: Valhalla (profilo moto, server FOSSGIS) e OSRM (Open Source Routing Machine) · Ricerca luoghi: Photon · Meteo: <a href="https://open-meteo.com/">Open-Meteo</a> (modelli ECMWF/ICON/GFS).<br>
-    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">Versione 21 nov 2026 · rilascio 16</b>
+    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">Versione 21 nov 2026 · rilascio 17</b>
   </div>
 </main>
 </div>
@@ -1242,6 +1242,8 @@ async function fuelSearchAt(lat,lon,ctx){
   $('#fsList').innerHTML=found.length?`<div class="mut" style="margin:6px 0">${fu.toUpperCase()} · tocca un distributore per inserirlo nel percorso come sosta${ctx==='nav'?' (diventa la prossima tappa)':''}.</div>`+found.slice(0,25).map((f,i)=>`<div class="sv" data-fs="${i}" style="cursor:pointer"><div style="font-size:20px">⛽</div><div class="n"><b>${esc(f.name)}</b>
       <div class="mut">${(f.d/1000).toFixed(1)} km da qui${f.off!=null?' · '+(f.off<1000?Math.round(f.off)+' m':(f.off/1000).toFixed(1)+' km')+' dal percorso':''}${f.h24?' · 24h/self':f.oh?' · '+esc(f.oh):''}${closedDays(f.oh)?' · chiuso '+closedDays(f.oh):''}</div></div><span style="color:var(--acc);font-weight:700">➕</span></div>`).join('')
     :'<div class="empty">Nessun distributore trovato entro 25 km.</div>';
+  $('#fsList').insertAdjacentHTML('beforeend','<button id="fsHide" style="width:100%;margin-top:10px;font-weight:800">🚫 Nascondi questi distributori dalla mappa</button>');
+  $('#fsHide').onclick=()=>{nearFuelOff();sh.classList.remove('on');toast('Distributori vicini nascosti');};
   $('#fsList').querySelectorAll('[data-fs]').forEach(e=>e.onclick=()=>{const f=found[+e.dataset.fs];sh.classList.remove('on');nearFuelOff();addFuelStop(f,ctx);});
 }
 async function navInsertStop(stop,label){
@@ -2624,7 +2626,7 @@ autoStart();
 if(location.hash.startsWith('#r')){try{applyPayload(b64d(location.hash.slice(2)));calc();}catch(e){console.warn(e);}}
 
 /* ================= aggiornamento automatico dell'app ================= */
-const APP_REL=16;
+const APP_REL=17;
 async function checkUpdate(){
   try{const r=await fetch('version.txt?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=parseInt((await r.text()).trim(),10);
     if(v>APP_REL){const k='motorotta_upd_try';if(LS.get(k,0)===v)return;LS.set(k,v);toast('⬇️ Nuova versione disponibile: aggiorno l’app…');
