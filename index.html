@@ -20,7 +20,7 @@
 body.dark{--bg:#0f1115;--card:#181b22;--line:#2a2f3a;--tx:#e8eaf0;--mut:#9aa3b2;--acc:#ff7a1a;--g:#3ecf6e;--y:#f2c94c;--o:#f2994a;--r:#eb5757;--b:#5aa9ff;--inp:#0f1218;--btn:#232833;--head:#0b0d11;--kpi:#0f1218;--sel:#211a14;--badge:#2b3140;--sug:#20242d}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
-header{display:flex;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top) + 8px) 14px 8px;background:var(--head);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:1000}
+header{display:flex;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top) + 8px) 14px 8px;background:var(--head);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:3000}
 .brand{font-weight:700;font-size:17px}.brand span{color:var(--acc)}
 #status{font-size:12px;color:var(--mut);max-width:60%;text-align:right}
 .pslab{font:700 11px/1.1 -apple-system,system-ui,sans-serif;color:#111;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 2px #fff;white-space:nowrap;text-align:center;pointer-events:none}
@@ -158,6 +158,15 @@ body.m3 #m3d{display:block}body.m3 #nmap{background:transparent!important;pointe
 body.m3 #nmap .leaflet-pane{visibility:hidden}body.m3 #nmap .leaflet-control{pointer-events:auto}
 .m3me{width:34px;height:34px}
 #nmap .leaflet-top{top:92px}#simBar{flex-wrap:wrap}#simBar button{padding:10px 12px!important}
+/* riquadri ordinati con contorno giallo */
+.card{border:2px solid #ffd400!important;border-radius:16px!important;padding:14px!important;margin-bottom:12px!important}
+body.hc .card{border:3px solid #d4a800!important}
+.btngrid{display:grid!important;grid-template-columns:1fr 1fr;gap:8px}
+.btngrid>button,.btngrid>.file{width:100%;box-sizing:border-box;text-align:center;justify-content:center;display:flex;align-items:center;white-space:normal;line-height:1.2;margin:0}
+input,select,textarea{max-width:100%;box-sizing:border-box}
+input[type=datetime-local]{width:100%;min-width:0;-webkit-appearance:none;appearance:none;display:block}
+.fld{display:block;max-width:100%}
+.grid2>*{min-width:0}
 .sheet{background:var(--card);border-top:2px solid var(--acc);border-radius:18px 18px 0 0;padding:14px 14px calc(env(safe-area-inset-bottom) + 18px);width:100%;max-height:88vh;overflow:auto}
 .rrow{display:flex;align-items:center;justify-content:space-between;margin:6px 0}
 .stars span{font-size:26px;color:#555;padding:0 3px;cursor:pointer}
@@ -174,7 +183,7 @@ body.m3 #nmap .leaflet-pane{visibility:hidden}body.m3 #nmap .leaflet-control{poi
 <main>
   <section class="card">
     <div id="stops"></div>
-    <div class="row">
+    <div class="row btngrid">
       <button id="addVia">＋ Tappa</button>
       <button id="swap">⇅ Inverti</button>
       <label class="file">📂 Importa GPX/KML<input type="file" id="gpxIn"></label>
@@ -223,7 +232,7 @@ body.m3 #nmap .leaflet-pane{visibility:hidden}body.m3 #nmap .leaflet-control{poi
 
   <div class="foot">
     Mappe © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · Percorsi: Valhalla (profilo moto, server FOSSGIS) e OSRM (Open Source Routing Machine) · Ricerca luoghi: Photon · Meteo: <a href="https://open-meteo.com/">Open-Meteo</a> (modelli ECMWF/ICON/GFS).<br>
-    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">Versione 21 nov 2026 · rilascio 19 (voce svolte)</b>
+    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">Versione 21 nov 2026 · rilascio 20 (mappa 3D, riquadri gialli, grassetto)</b>
   </div>
 </main>
 </div>
@@ -1816,6 +1825,8 @@ function navManeuver(pr){
 }
 let alertT=null;
 function showAlert(txt,say){const b=$('#alertBanner');b.innerHTML=txt;b.classList.add('on');clearTimeout(alertT);alertT=setTimeout(()=>b.classList.remove('on'),9000);if(say)speak(say);}
+function fuelBigHTML(col,name){const z=col==='#e60000'?40:32;return `<div style="display:flex;flex-direction:column;align-items:center;width:150px;pointer-events:none"><div style="width:${z}px;height:${z}px;border-radius:50%;background:${col};border:3px solid #fff;box-shadow:0 0 0 2px #111,0 2px 6px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;font-size:${Math.round(z*0.55)}px">⛽</div><div class="pslab" style="font-size:12px;margin-top:2px">${esc((name||'').slice(0,28))}</div></div>`;}
+function fuelBigIcon(col,name){return L.divIcon({className:'',html:fuelBigHTML(col,name),iconSize:[150,60],iconAnchor:[75,20]});}
 function navDraw(){
   if(!NAV.mapI||!NAV.layers)return;NAV.layers.clearLayers();
   L.polyline(NAV.coords,{color:'#0b3d6e',weight:11,opacity:.35}).addTo(NAV.layers);
@@ -1823,8 +1834,8 @@ function navDraw(){
   try{const ev=S.ev[S.sel];if(ev)ev.pts.forEach((p,i)=>{const nx=ev.pts[i+1];if(!nx)return;const lvl=Math.max(riskOf(p).lvl,riskOf(nx).lvl);if(!lvl)return;
     const a=navProj(p.p,0,NAV.coords.length),b=navProj(nx.p,0,NAV.coords.length);if(a.d<300&&b.d<300&&b.i>a.i)L.polyline(NAV.coords.slice(a.i,b.i+2),{color:RISKCOL[lvl],weight:8}).addTo(NAV.layers);});
     (S.routes[S.sel]&&S.routes[S.sel].closures||[]).filter(c=>c.active).forEach(c=>L.marker(c.p,{icon:L.divIcon({className:'',html:'<div class="wxi">⛔</div>',iconSize:[22,22],iconAnchor:[11,11]})}).addTo(NAV.layers));
-    const fp=fuelPlan(S.routes[S.sel]);fp.stops.forEach(x=>{if(!x.synthetic)L.circleMarker(x.p,{radius:14,color:'#111',weight:2,fillColor:'#e60000',fillOpacity:1}).bindTooltip('⛽ '+x.name).addTo(NAV.layers);
-      if(x.backup)L.circleMarker(x.backup.p,{radius:11,color:'#111',weight:2,fillColor:'#29b6ff',fillOpacity:1}).bindTooltip('⛽ riserva '+x.backup.name).addTo(NAV.layers);});}catch(e){}
+    const fp=fuelPlan(S.routes[S.sel]);fp.stops.forEach(x=>{if(!x.synthetic)L.marker(x.p,{zIndexOffset:900,icon:fuelBigIcon('#e60000',x.name)}).addTo(NAV.layers);
+      if(x.backup)L.marker(x.backup.p,{zIndexOffset:800,icon:fuelBigIcon('#29b6ff','riserva · '+x.backup.name)}).addTo(NAV.layers);});}catch(e){}
   NAV.stops.forEach((s,k)=>{const col=s.state==='done'?'#3ecf6e':s.state==='skipped'?'#777':k===NAV.next?'#ff7a1a':'#fff';
     L.circleMarker([s.p.lat,s.p.lon],{radius:k===NAV.next?9:7,color:'#111',weight:2,fillColor:col,fillOpacity:1}).bindTooltip(s.name).addTo(NAV.layers);});
   Object.values(sels()).forEach(v=>L.marker(v.p,{icon:L.divIcon({className:'',html:`<div style="background:#fff;border:2px solid #f26b00;border-radius:12px;padding:1px 4px;font-size:15px">📌${catOf(v.cat).ic}</div>`,iconSize:[44,24],iconAnchor:[22,12]})}).addTo(NAV.layers));
@@ -2684,7 +2695,7 @@ function addMicCtl(m){try{const C=L.Control.extend({onAdd(){const d=L.DomUtil.cr
     L.DomEvent.disableClickPropagation(d);d.onclick=()=>{unlockAudio();vOnce();};return d;}});new C({position:'bottomleft'}).addTo(m);}catch(e){}}
 
 /* ================= mappa 3D in navigazione (MapLibre, gratuita) ================= */
-const FEAT3D=/\/beta\//.test(location.pathname)||location.protocol==='file:';
+const FEAT3D=true;
 const M3={on:FEAT3D&&LS.get('motorotta_3d',false),map:null,ready:false,loading:null,cref:null,eref:null,me:null,btns:[]};
 const ML_V='4.7.1';
 function loadML(){if(window.maplibregl)return Promise.resolve();if(M3.loading)return M3.loading;
@@ -2711,6 +2722,7 @@ async function m3Init(){await loadML();if(M3.map)return;
     m.addLayer({id:'pt-lab',type:'symbol',source:'pt',layout:{'text-field':['get','lab'],'text-size':13,'text-offset':[0,1.6],'text-anchor':'top','text-optional':true},paint:{'text-color':'#111','text-halo-color':'#fff','text-halo-width':2}});
     const el=document.createElement('div');el.className='m3me';el.innerHTML='<svg viewBox="0 0 34 34" width="34" height="34"><circle cx="17" cy="17" r="15" fill="#ff7a1a" stroke="#fff" stroke-width="3"/><path d="M17 6 L25 25 L17 20 L9 25 Z" fill="#fff"/></svg>';
     M3.me=new maplibregl.Marker({element:el,rotationAlignment:'map',pitchAlignment:'map'}).setLngLat(ll(c)).addTo(m);
+    try{(m.getStyle().layers||[]).forEach(l=>{if(l.type==='symbol'&&l.layout&&l.layout['text-field']){m.setLayoutProperty(l.id,'text-font',['Noto Sans Bold']);m.setPaintProperty(l.id,'text-halo-width',2);}});}catch(e){}
     M3.ready=true;M3.cref=null;m3Sync(NAV.lastPr,true);});
   M3.map.on('error',e=>console.warn('3D',e&&e.error));
 }
@@ -2720,7 +2732,9 @@ function m3Data(){const m=M3.map;if(!m||!M3.ready)return;
     const a=navProj(p.p,0,NAV.coords.length),b=navProj(nx.p,0,NAV.coords.length);if(a.d<300&&b.d<300&&b.i>a.i)rk.push({type:'Feature',properties:{col:RISKCOL[lvl]},geometry:{type:'LineString',coordinates:NAV.coords.slice(a.i,b.i+2).map(ll)}});});}catch(e){}
   m.getSource('rk').setData({type:'FeatureCollection',features:rk});
   const pts=[];const P=(p,col,r,lab)=>pts.push({type:'Feature',properties:{col,r,lab:lab||''},geometry:{type:'Point',coordinates:ll(p)}});
-  try{const fp=fuelPlan(S.routes[S.sel]);fp.stops.forEach(x=>{if(!x.synthetic)P(x.p,'#e60000',13,'⛽ '+x.name);if(x.backup)P(x.backup.p,'#29b6ff',10,'⛽ riserva');});}catch(e){}
+  (M3.fmk||[]).forEach(k=>k.remove());M3.fmk=[];
+  try{const fp=fuelPlan(S.routes[S.sel]);const add=(p,col,nm)=>{const el=document.createElement('div');el.innerHTML=fuelBigHTML(col,nm);M3.fmk.push(new maplibregl.Marker({element:el.firstChild,anchor:'top'}).setLngLat(ll(p)).addTo(m));};
+    fp.stops.forEach(x=>{if(!x.synthetic)add(x.p,'#e60000',x.name);if(x.backup)add(x.backup.p,'#29b6ff','riserva · '+x.backup.name);});}catch(e){}
   NAV.stops.forEach((st,k)=>P([st.p.lat,st.p.lon],st.state==='done'?'#3ecf6e':st.state==='skipped'?'#777':k===NAV.next?'#ff7a1a':'#fff',k===NAV.next?10:8,st.name));
   try{(S.routes[S.sel].closures||[]).filter(c=>c.active).forEach(c=>P(c.p,'#000',9,'⛔ chiusura'));}catch(e){}
   m.getSource('pt').setData({type:'FeatureCollection',features:pts});
@@ -2807,7 +2821,7 @@ function renderTraffic(){
 }
 
 /* ================= avvio ================= */
-applyTheme();document.body.classList.toggle('bold',!!SET.bold);initGarageForm();vehSelUI();$('#vehSel').onchange=e=>setActiveVeh(e.target.value);
+if(SET.bold===undefined){SET.bold=true;saveSet();}applyTheme();document.body.classList.toggle('bold',!!SET.bold);initGarageForm();vehSelUI();$('#vehSel').onchange=e=>setActiveVeh(e.target.value);
 $('#poiSheet').addEventListener('click',e=>{if(e.target.id==='poiSheet')e.target.classList.remove('on');});
 renderStops();renderSaved();initSettings();
 setTimeout(()=>{drawSelLayer();renderSelCard();},200);
@@ -2820,7 +2834,7 @@ autoStart();
 if(location.hash.startsWith('#r')){try{applyPayload(b64d(location.hash.slice(2)));calc();}catch(e){console.warn(e);}}
 
 /* ================= aggiornamento automatico dell'app ================= */
-const APP_REL=19;
+const APP_REL=20;
 async function checkUpdate(){
   try{const r=await fetch('version.txt?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=parseInt((await r.text()).trim(),10);
     if(v>APP_REL){const k='motorotta_upd_try';if(LS.get(k,0)===v)return;LS.set(k,v);toast('⬇️ Nuova versione disponibile: aggiorno l’app…');
