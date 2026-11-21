@@ -223,7 +223,7 @@ body.m3 #nmap .leaflet-pane{visibility:hidden}body.m3 #nmap .leaflet-control{poi
 
   <div class="foot">
     Mappe © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · Percorsi: Valhalla (profilo moto, server FOSSGIS) e OSRM (Open Source Routing Machine) · Ricerca luoghi: Photon · Meteo: <a href="https://open-meteo.com/">Open-Meteo</a> (modelli ECMWF/ICON/GFS).<br>
-    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">VERSIONE DI PROVA · fase 4 mappa 3D (21 nov 2026)</b>
+    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">VERSIONE DI PROVA · rilascio 19 + mappa 3D</b>
   </div>
 </main>
 </div>
@@ -1589,15 +1589,22 @@ document.querySelectorAll('#bnav button').forEach(b=>b.onclick=()=>showView(b.da
 
 /* ================= audio ================= */
 let AC=null;
-function unlockAudio(){try{if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)();AC.resume();}catch(e){}}
+let VOICE_OK=false;
+function unlockAudio(){try{if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)();AC.resume();}catch(e){}
+  // iPhone: la voce si sblocca solo se la prima frase parte dentro un tocco
+  try{if(!VOICE_OK&&'speechSynthesis' in window){const u=new SpeechSynthesisUtterance(' ');u.lang='it-IT';u.volume=0.01;speechSynthesis.speak(u);VOICE_OK=true;}}catch(e){}}
 function beep(f=880,ms=300,vol=0.6){
   if(!AC)return;try{const o=AC.createOscillator(),g=AC.createGain();o.type='square';o.frequency.value=f;g.gain.value=vol;
   o.connect(g);g.connect(AC.destination);o.start();o.stop(AC.currentTime+ms/1000);}catch(e){}
 }
-function speak(text){
+function itVoice(){const vs=speechSynthesis.getVoices().filter(x=>x.lang&&x.lang.toLowerCase().startsWith('it'));
+  return vs.find(x=>/enhanced|premium|migliorat/i.test(x.name))||vs.find(x=>/alice|federica|luca|paola/i.test(x.name))||vs[0];}
+function speak(text,urgent){
   if(!('speechSynthesis' in window)){toast('Sintesi vocale non disponibile');return;}
-  speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang='it-IT';u.rate=1;
-  const v=speechSynthesis.getVoices().find(x=>x.lang&&x.lang.startsWith('it'));if(v)u.voice=v;
+  // le indicazioni di svolta hanno la precedenza; gli altri avvisi si mettono in coda invece di interrompersi a vicenda
+  if(urgent||speechSynthesis.pending)speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text);u.lang='it-IT';u.rate=1;u.volume=1;
+  const v=itVoice();if(v)u.voice=v;
   speechSynthesis.speak(u);
 }
 function routeSummaryText(withTraffic){
@@ -1804,8 +1811,8 @@ function navManeuver(pr){
   $('#manDist').textContent=dist<950?Math.round(dist/10)*10+' m':(dist/1000).toFixed(1)+' km';$('#manTxt').textContent=m.txt+(m.street&&!m.txt.includes(m.street)?' · '+m.street:'');
   if(SET.tbt===false)return;const k=m.i+'|'+m.type;NAV.mSaid[k]=NAV.mSaid[k]||{};const sd=NAV.mSaid[k];
   const v=Math.max(RD.v,8);const far=Math.max(500,v*25),near=Math.max(150,v*9);
-  if(dist<=far&&dist>near*1.6&&!sd.far){sd.far=1;speak(`Tra ${mSay(dist)}, ${(m.alert||m.txt).replace(/\.$/,'')}.`);}
-  else if(dist<=near&&dist>25&&!sd.near){sd.near=1;sd.far=1;speak(m.pre||m.txt);}
+  if(dist<=far&&dist>near*1.6&&!sd.far){sd.far=1;speak(`Tra ${mSay(dist)}, ${(m.alert||m.txt).replace(/\.$/,'')}.`,true);}
+  else if(dist<=near&&!sd.near){sd.near=1;sd.far=1;speak(m.pre||m.txt,true);}
 }
 let alertT=null;
 function showAlert(txt,say){const b=$('#alertBanner');b.innerHTML=txt;b.classList.add('on');clearTimeout(alertT);alertT=setTimeout(()=>b.classList.remove('on'),9000);if(say)speak(say);}
@@ -2813,7 +2820,7 @@ autoStart();
 if(location.hash.startsWith('#r')){try{applyPayload(b64d(location.hash.slice(2)));calc();}catch(e){console.warn(e);}}
 
 /* ================= aggiornamento automatico dell'app ================= */
-const APP_REL=18;
+const APP_REL=19;
 async function checkUpdate(){
   try{const r=await fetch('version.txt?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=parseInt((await r.text()).trim(),10);
     if(v>APP_REL){const k='motorotta_upd_try';if(LS.get(k,0)===v)return;LS.set(k,v);toast('⬇️ Nuova versione disponibile: aggiorno l’app…');
