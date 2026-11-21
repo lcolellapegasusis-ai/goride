@@ -10,25 +10,28 @@ def run(q):
         for u in OVP:
             try:
                 req = urllib.request.Request(u, data=urllib.parse.urlencode({'data': q}).encode(), headers={'User-Agent': 'GoRide HD updater'})
-                return json.loads(urllib.request.urlopen(req, timeout=200).read())
+                d = json.loads(urllib.request.urlopen(req, timeout=300).read())
+                if d.get('remark') and not d.get('elements'):
+                    raise Exception(d['remark'][:80])
+                return d
             except Exception as e:  # noqa
                 print('overpass fallito', u, str(e)[:80], file=sys.stderr); time.sleep(10)
     return None
 
-q = (f'[out:json][timeout:180];('
-     f'nwr({BB})["shop"~"^motorcycle"]["brand"~"harley",i];'
-     f'nwr({BB})["shop"~"^motorcycle"]["name"~"harley",i];'
-     f'nwr({BB})["brand"~"^harley",i]["shop"];'
-     f');out tags center;')
+# query semplice e veloce (solo chiave=valore), il filtro "Harley" lo faccio qui
+q = f'[out:json][timeout:280][maxsize:536870912];nwr({BB})["shop"="motorcycle"];out tags center;'
 j = run(q)
 if not j:
     raise SystemExit('Overpass non disponibile')
-itq = '[out:json][timeout:180];area["ISO3166-1"="IT"]["admin_level"="2"]->.a;(nwr(area.a)["shop"]["brand"~"harley",i];nwr(area.a)["shop"]["name"~"harley",i];);out ids;'
+itq = '[out:json][timeout:280];area["ISO3166-1"="IT"]["admin_level"="2"]->.a;nwr(area.a)["shop"="motorcycle"];out ids;'
 jit = run(itq) or {'elements': []}
 ids_it = {(e['type'], e['id']) for e in jit.get('elements', [])}
 out = []
 for e in j.get('elements', []):
     t = e.get('tags', {})
+    txt = ' '.join([t.get('brand', ''), t.get('name', ''), t.get('operator', ''), t.get('brand:wikidata', '')]).lower()
+    if 'harley' not in txt and 'q192814' not in txt:
+        continue
     la = e.get('lat') or e.get('center', {}).get('lat'); lo = e.get('lon') or e.get('center', {}).get('lon')
     if la is None:
         continue
@@ -38,7 +41,7 @@ for e in j.get('elements', []):
     name = t.get('name') or 'Harley-Davidson'
     out.append([round(la, 5), round(lo, 5), name[:60], (t.get('addr:city') or '')[:40], cc,
                 (t.get('phone') or t.get('contact:phone') or '').split(';')[0], (t.get('website') or t.get('contact:website') or '')[:120]])
-if len(out) < 50:
+if len(out) < 30:
     raise SystemExit(f'Troppo poche concessionarie ({len(out)})')
 os.makedirs('data', exist_ok=True)
 json.dump({'v': datetime.date.today().isoformat(), 'd': out}, open('data/hd.json', 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
