@@ -136,6 +136,15 @@ select{width:100%;background:var(--inp);color:var(--tx);border:1px solid var(--l
 .emctl a,.emctl div{width:50px;height:50px;border-radius:14px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-size:26px;cursor:pointer;text-decoration:none}
 .bigbtn{display:block;width:100%;margin:8px 0;padding:15px 12px;border-radius:14px;font-size:18px;font-weight:800;text-align:left;text-decoration:none;color:#fff;border:0;box-sizing:border-box}
 .bigbtn small{display:block;font-weight:600;font-size:13px;opacity:.9;margin-top:2px}
+.psctl{width:50px!important;height:50px!important;font-size:26px!important;border-radius:14px!important}
+button,.file{font-size:16px!important;padding:12px 14px!important;min-height:46px}
+.tabs button{font-size:15px!important;padding:12px 4px!important}
+.mut{font-size:14px!important}h3{font-size:17px!important}
+#bnav button{font-size:26px!important}#bnav button span{font-size:12px!important;font-weight:700}
+.chip{font-size:15px!important;padding:10px 12px!important}
+.leaflet-control-zoom a{width:44px!important;height:44px!important;line-height:44px!important;font-size:24px!important}
+.leaflet-popup-content{font-size:15px!important}
+.sv{min-height:52px}
 .sheet{background:var(--card);border-top:2px solid var(--acc);border-radius:18px 18px 0 0;padding:14px 14px calc(env(safe-area-inset-bottom) + 18px);width:100%;max-height:88vh;overflow:auto}
 .rrow{display:flex;align-items:center;justify-content:space-between;margin:6px 0}
 .stars span{font-size:26px;color:#555;padding:0 3px;cursor:pointer}
@@ -201,7 +210,7 @@ select{width:100%;background:var(--inp);color:var(--tx);border:1px solid var(--l
 
   <div class="foot">
     Mappe © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · Percorsi: Valhalla (profilo moto, server FOSSGIS) e OSRM (Open Source Routing Machine) · Ricerca luoghi: Photon · Meteo: <a href="https://open-meteo.com/">Open-Meteo</a> (modelli ECMWF/ICON/GFS).<br>
-    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">VERSIONE DI PROVA · fase 1 sicurezza (21 nov 2026)</b>
+    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">VERSIONE DI PROVA · fasi 1–2 (21 nov 2026)</b>
   </div>
 </main>
 </div>
@@ -875,6 +884,9 @@ try{const FCtl=L.Control.extend({onAdd(){const d=L.DomUtil.create('div','psctl'+
   L.DomEvent.disableClickPropagation(d);d.onclick=()=>{FUEL_ALL=!FUEL_ALL;LS.set('motorotta_fuel_all',FUEL_ALL);d.classList.toggle('on',FUEL_ALL);
     if(fuelAllLayer){if(FUEL_ALL)fuelAllLayer.addTo(map);else fuelAllLayer.remove();}toast(FUEL_ALL?'⛽ Tutti i distributori visibili':'⛽ Solo sosta (rossa) e riserva (azzurra)');};return d;}});
   new FCtl({position:'topright'}).addTo(map);}catch(e){}
+function addNearFuelCtl(m,ctx){try{const C=L.Control.extend({onAdd(){const d=L.DomUtil.create('div','psctl');d.title='Distributore vicino a me';d.style.background='#29b6ff';d.style.borderColor='#fff';d.innerHTML='⛽';
+    L.DomEvent.disableClickPropagation(d);d.onclick=async()=>{const p=await myPos();if(!p){locHelp({code:1});return;}fuelSearchAt(p[0],p[1],ctx);};return d;}});new C({position:'topright'}).addTo(m);}catch(e){}}
+addNearFuelCtl(map,'plan');
 function drawMap(fit){setTimeout(drawStopMarkers,0);
   layer.clearLayers();
   S.routes.forEach((r,i)=>{if(i===S.sel)return;
@@ -892,7 +904,7 @@ function drawMap(fit){setTimeout(drawStopMarkers,0);
     const ic=L.divIcon({className:'',html:`<div class="wxi">${WMO(p.w.code,p.night)}</div>`,iconSize:[22,22],iconAnchor:[11,11]});
     L.marker(p.p,{icon:ic}).bindPopup(popup(p)).addTo(layer);
   });
-  try{const mk=(x,col,title)=>L.marker(x.p,{icon:L.divIcon({className:'',html:`<div style="width:24px;height:24px;border-radius:50%;background:${col};border:2px solid #111;display:flex;align-items:center;justify-content:center;font-size:13px">⛽</div>`,iconSize:[24,24],iconAnchor:[12,12]})})
+  try{const mk=(x,col,title,z=(col==='#e60000'?36:28))=>L.marker(x.p,{zIndexOffset:col==='#e60000'?900:800,icon:L.divIcon({className:'',html:`<div style="width:${z}px;height:${z}px;border-radius:50%;background:${col};border:3px solid #fff;box-shadow:0 0 0 2px #111,0 2px 6px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;font-size:${z*0.55}px">⛽</div>`,iconSize:[z,z],iconAnchor:[z/2,z/2]})})
       .bindPopup(`<b>${title}</b><br>${esc(x.synthetic?'Nessun distributore trovato':x.name)}<br>km ${Math.round(x.km)} · ~${fmtT(x.t)}<br>autonomia all’arrivo ${Math.round(x.rangeArr)} km<br>${x.synthetic?`<a href="#" onclick="fuelSearchAt(${x.p[0]},${x.p[1]},'plan');return false">🔍 Cerca distributori qui</a>`:`<a href="${navToUrl(x.p)}" target="_blank" rel="noopener">Portami qui</a>`}`).addTo(layer);
     if(!fuelAllLayer)fuelAllLayer=L.layerGroup();fuelAllLayer.clearLayers();if(FUEL_ALL)fuelAllLayer.addTo(map);
     const fp0=fuelPlan(r);const used=new Set(fp0.stops.flatMap(x=>[x.p+'',x.backup?x.backup.p+'':'']));
@@ -1202,7 +1214,11 @@ async function fuelSearchAt(lat,lon,ctx){
   sh.classList.add('on');$('#fsX').onclick=()=>sh.classList.remove('on');
   const fu=V().fuel;const okF=t=>fu==='gpl'?t['fuel:lpg']==='yes':fu==='metano'?t['fuel:cng']==='yes':fu==='diesel'?t['fuel:diesel']!=='no':t['fuel:octane_95']!=='no';
   let found=[];
-  try{
+  const db=inItaly([lat,lon])?await loadFuelDB():null;
+  if(db){const a=Math.floor(lat*20),b=Math.floor(lon*20);for(const R of [5000,12000,25000]){found=[];const g=Math.ceil(R/5500)+1;
+      for(let da=-g;da<=g;da++)for(let db2=-g;db2<=g;db2++)(db.grid.get((a+da)+','+(b+db2))||[]).forEach(ix=>{const x=dbStation(db,db.s[ix]);const d=hav([lat,lon],x.p);if(d<=R&&(fu==='gpl'?x.lpg==='yes':fu==='metano'?x.cng==='yes':fu==='diesel'?x.diesel!=='no':x.o95!=='no'))found.push({...x,d,key:'m'+ix});});
+      if(found.length>=3)break;}}
+  else try{
     for(const R of [5000,12000,25000]){
       const q=`[out:json][timeout:30];(nwr(around:${R},${lat.toFixed(5)},${lon.toFixed(5)})["amenity"="fuel"];nwr(around:${R+600},${lat.toFixed(5)},${lon.toFixed(5)})["highway"~"^(services|rest_area)$"];);out tags center 300;`;
       const j=await overpass(q);const el=j.elements||[];
@@ -1227,13 +1243,11 @@ async function navInsertStop(stop,label){
   const nxt=NAV.stops[NAV.next];if(!nxt||!NAV.me){toast('Posizione non disponibile');return;}
   navStatus('🔄 Inserisco '+esc(label)+'…','#4a3a12');
   try{const mode=LS.get('motorotta_mode','curvy');const m=MODES[mode]||MODES.curvy;ROUTE_PREF={hw:m.hw,toll:$('#optToll').checked};
-    const r=(await routeSafe([NAV.me,[stop.p.lat,stop.p.lon],[nxt.p.lat,nxt.p.lon]],false,null)).rs[0];
-    const cut=(nxt.ci||0)+1;const tail=NAV.coords.slice(cut);
-    const man=(r.man||[]).filter(x=>![4,5,6].includes(x.type)).concat((NAV.man||[]).filter(x=>x.i>=cut).map(x=>({...x,i:x.i-cut+r.coords.length})));
-    NAV.stops.splice(NAV.next,0,{p:stop.p,name:stop.p.name,state:'todo'});
+    await navRejoin(stop,label);
+    NAV.stops.splice(NAV.next,0,{p:stop.p,name:stop.p.name,state:'todo'});NAV.stops.slice(NAV.next).forEach(x=>x.ci=null);navSetGeometry(NAV.coords);
     const si=S.stops.findIndex(x=>x.p&&x.p.lat===nxt.p.lat&&x.p.lon===nxt.p.lon);S.stops.splice(si>0?si:S.stops.length-1,0,stop);
-    NAV.stops.slice(NAV.next).forEach(x=>x.ci=null);navSetGeometry(r.coords.concat(tail));NAV.man=man;NAV.mSaid={};NAV.lastI=0;NAV.offCount=0;NAV.quietUntil=Date.now()+15000;
-    navDraw();saveTrip();navStatus('✅ Prossima tappa: '+esc(stop.p.name),'#16351f');speak(label+' aggiunto come prossima tappa.');
+    NAV.quietUntil=Date.now()+15000;
+    navDraw();saveTrip();navStatus('✅ Deviazione: '+esc(stop.p.name)+', poi rientro sull’itinerario','#16351f');speak(label+' aggiunto. Dopo la sosta ti riporto sull\'itinerario originale.');
   }catch(e){navStatus('📵 Impossibile ricalcolare ora','#4a3a12');toast('Ricalcolo non riuscito: riprova');}
 }
 function addFuelStop(f,ctx){
@@ -1679,6 +1693,19 @@ function navProj(p,from,to){ // punto più vicino sulla polilinea
   }
   best.along=NAV.cum[best.i]+(NAV.cum[best.i+1]-NAV.cum[best.i])*best.t;return best;
 }
+/* punto dell'itinerario originale dove rientrare: il più vicino davanti a me (mai indietro), +300 m per non fare inversioni */
+function navRejoinIdx(p,limit){const c=NAV.coords;if(!c.length)return 0;const a=Math.max(0,NAV.lastI||0),b=Math.min(c.length-1,limit==null?c.length-1:limit);
+  let best=a,bd=Infinity;for(let i=a;i<=b;i+=1){const d=hav(p,c[i]);if(d<bd){bd=d;best=i;}}
+  const target=(NAV.cum[best]||0)+300;let j=best;while(j<b&&NAV.cum[j]<target)j++;return j;}
+async function navRejoin(via,label,msgOk){ // percorso: io → (via) → rientro sull'itinerario originale; poi resto invariato
+  const nxt=NAV.stops[NAV.next];const lim=nxt&&nxt.ci!=null?nxt.ci:null;
+  const ref=via?[via.p.lat,via.p.lon]:NAV.me;const J=navRejoinIdx(ref,lim);const jp=NAV.coords[J];
+  const pts=via?[NAV.me,[via.p.lat,via.p.lon],jp]:[NAV.me,jp];
+  const r=(await routeSafe(pts,false,null)).rs[0];
+  const tail=NAV.coords.slice(J+1);
+  const man=(r.man||[]).filter(x=>![4,5,6].includes(x.type)).concat((NAV.man||[]).filter(x=>x.i>J).map(x=>({...x,i:x.i-(J+1)+r.coords.length})));
+  NAV.stops.slice(NAV.next).forEach(x=>x.ci=null);navSetGeometry(r.coords.concat(tail));NAV.man=man;NAV.mSaid={};NAV.lastI=0;NAV.offCount=0;
+  return r;}
 function navSetGeometry(coords){
   NAV.coords=coords;NAV.cum=[0];for(let i=1;i<coords.length;i++)NAV.cum.push(NAV.cum[i-1]+hav(coords[i-1],coords[i]));
   let from=0;NAV.stops.forEach((s,k)=>{if(k<NAV.next){if(s.d==null)s.d=0;return;}
@@ -1710,7 +1737,7 @@ function navMapInit(){
   if(NAV.mapI){NAV.mapI.remove();NAV.mapI=null;}
   try{NAV.mapI=L.map('nmap',{zoomControl:false,attributionControl:false,doubleClickZoom:false,rotate:true,touchRotate:false,rotateControl:false,bearing:0});
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(NAV.mapI);
-    NAV.layers=L.layerGroup().addTo(NAV.mapI);addEmCtl(NAV.mapI);try{NAV.pass=makePassLayer(NAV.mapI,'nav',()=>({coords:NAV.coords,len:NAV.len}));}catch(e){}NAV.mapI.fitBounds(L.latLngBounds(NAV.coords),{padding:[20,20]});
+    NAV.layers=L.layerGroup().addTo(NAV.mapI);addEmCtl(NAV.mapI);addNearFuelCtl(NAV.mapI,'nav');try{NAV.pass=makePassLayer(NAV.mapI,'nav',()=>({coords:NAV.coords,len:NAV.len}));}catch(e){}NAV.mapI.fitBounds(L.latLngBounds(NAV.coords),{padding:[20,20]});
     NAV.mapI.on('dblclick',e=>{if(NAV.follow){NAV.follow=false;NAV.mapI.setView(e.latlng,Math.min(19,(NAV.mapI.getZoom()||15)+2),{animate:true});
         $('#recenter').style.display='block';clearTimeout(NAV.backT);NAV.backT=setTimeout(navBack,5000);}else navBack();});
     NAV.mapI.on('dragstart',()=>{NAV.follow=false;$('#recenter').style.display='block';clearTimeout(NAV.backT);NAV.backT=setTimeout(navBack,5000);});
@@ -1748,8 +1775,8 @@ function navDraw(){
   try{const ev=S.ev[S.sel];if(ev)ev.pts.forEach((p,i)=>{const nx=ev.pts[i+1];if(!nx)return;const lvl=Math.max(riskOf(p).lvl,riskOf(nx).lvl);if(!lvl)return;
     const a=navProj(p.p,0,NAV.coords.length),b=navProj(nx.p,0,NAV.coords.length);if(a.d<300&&b.d<300&&b.i>a.i)L.polyline(NAV.coords.slice(a.i,b.i+2),{color:RISKCOL[lvl],weight:8}).addTo(NAV.layers);});
     (S.routes[S.sel]&&S.routes[S.sel].closures||[]).filter(c=>c.active).forEach(c=>L.marker(c.p,{icon:L.divIcon({className:'',html:'<div class="wxi">⛔</div>',iconSize:[22,22],iconAnchor:[11,11]})}).addTo(NAV.layers));
-    const fp=fuelPlan(S.routes[S.sel]);fp.stops.forEach(x=>{if(!x.synthetic)L.circleMarker(x.p,{radius:9,color:'#111',weight:2,fillColor:'#e60000',fillOpacity:1}).bindTooltip('⛽ '+x.name).addTo(NAV.layers);
-      if(x.backup)L.circleMarker(x.backup.p,{radius:8,color:'#111',weight:2,fillColor:'#29b6ff',fillOpacity:1}).bindTooltip('⛽ riserva '+x.backup.name).addTo(NAV.layers);});}catch(e){}
+    const fp=fuelPlan(S.routes[S.sel]);fp.stops.forEach(x=>{if(!x.synthetic)L.circleMarker(x.p,{radius:14,color:'#111',weight:2,fillColor:'#e60000',fillOpacity:1}).bindTooltip('⛽ '+x.name).addTo(NAV.layers);
+      if(x.backup)L.circleMarker(x.backup.p,{radius:11,color:'#111',weight:2,fillColor:'#29b6ff',fillOpacity:1}).bindTooltip('⛽ riserva '+x.backup.name).addTo(NAV.layers);});}catch(e){}
   NAV.stops.forEach((s,k)=>{const col=s.state==='done'?'#3ecf6e':s.state==='skipped'?'#777':k===NAV.next?'#ff7a1a':'#fff';
     L.circleMarker([s.p.lat,s.p.lon],{radius:k===NAV.next?9:7,color:'#111',weight:2,fillColor:col,fillOpacity:1}).bindTooltip(s.name).addTo(NAV.layers);});
   Object.values(sels()).forEach(v=>L.marker(v.p,{icon:L.divIcon({className:'',html:`<div style="background:#fff;border:2px solid #f26b00;border-radius:12px;padding:1px 4px;font-size:15px">📌${catOf(v.cat).ic}</div>`,iconSize:[44,24],iconAnchor:[22,12]})}).addTo(NAV.layers));
@@ -1796,14 +1823,10 @@ async function navRecalc(pos,toStop){ // ricalcolo dalla posizione attuale verso
     const mode=LS.get('motorotta_mode','curvy');const m=MODES[mode]||MODES.curvy;
     const ex=[m.ex?'motorway':null,$('#optToll').checked?'toll':null].filter(Boolean).join(',');
     ROUTE_PREF={hw:m.hw,toll:$('#optToll').checked};
-    navStatus('🔄 Ricalcolo verso '+esc(n.name)+'…','#4a3a12');
-    const r=(await routeSafe([pos,[n.p.lat,n.p.lon]],false,ex)).rs[0];
-    const cut=(n.ci||0)+1;const tail=NAV.coords.slice(cut);
-    const man=(r.man||[]).filter(m=>![4,5,6].includes(m.type)).concat((NAV.man||[]).filter(m=>m.i>=cut).map(m=>({...m,i:m.i-cut+r.coords.length})));
-    NAV.stops.slice(NAV.next+1).forEach(s=>s.ci=null);n.ci=null;
-    navSetGeometry(r.coords.concat(tail));NAV.man=man;NAV.mSaid={};saveTrip();
-    NAV.lastI=0;NAV.offCount=0;NAV.recalcPending=false;NAV.quietUntil=Date.now()+20000;
-    navDraw();navStatus('✅ Nuovo percorso verso '+esc(n.name),'#16351f');speak('Percorso ricalcolato verso '+n.name+'.');
+    navStatus('🔄 Ti riporto sull’itinerario…','#4a3a12');
+    if(!NAV.me)NAV.me=pos;await navRejoin(toStop?{p:n.p}:null,'');saveTrip();
+    NAV.recalcPending=false;NAV.quietUntil=Date.now()+20000;
+    navDraw();navStatus('✅ Rientro sull’itinerario, poi '+esc(n.name),'#16351f');speak('Ti riporto sull\'itinerario originale, nel punto più vicino davanti a te.');
   }catch(e){NAV.recalcPending=true;navStatus('📵 Rete assente: segui la linea arancione, ricalcolo appena torna il segnale','#4a3a12');}
 }
 function navFuel(){
@@ -1934,7 +1957,7 @@ $('#tripResume').onclick=()=>{unlockAudio();resumeTrip();};
 $('#tripClose').onclick=()=>{const b=$('#tripClose');if(!b.dataset.c){b.dataset.c=1;b.textContent='Tocca di nuovo per chiudere';return;}b.dataset.c='';b.textContent='🏁 Chiudi viaggio';clearTrip();toast('Viaggio chiuso');};
 $('#navSkip').onclick=()=>{const n=NAV.stops[NAV.next];if(n&&NAV.next<NAV.stops.length-1){navAdvance('skip');navUI(null);}};
 $('#askGo').onclick=()=>{navAskClose();navAdvance('skip');};
-$('#askBack').onclick=()=>{navAskClose();NAV.quietUntil=Date.now()+60000;const n=NAV.stops[NAV.next];speak('Torniamo alla tappa '+n.name+'.');NAV.lastRecalc=0;if(NAV.me)navRecalc(NAV.me);};
+$('#askBack').onclick=()=>{navAskClose();NAV.quietUntil=Date.now()+60000;const n=NAV.stops[NAV.next];speak('Torniamo alla tappa '+n.name+'.');NAV.lastRecalc=0;if(NAV.me)navRecalc(NAV.me,true);};
 window.addEventListener('online',()=>{if(NAV.active&&NAV.recalcPending&&NAV.me){NAV.lastRecalc=0;navRecalc(NAV.me);}});
 
 /* ================= SCOPRI lungo il percorso (OpenStreetMap, gratuito) ================= */
@@ -1946,7 +1969,7 @@ const POI_CATS=[
   {k:'passo',ic:'🏔️',n:'Passi di montagna',s:'Passo di montagna'},{k:'spa',ic:'💆',n:'SPA',s:'SPA'},{k:'agrispa',ic:'🌾💆',n:'Agriturismi con SPA',s:'Agriturismo con SPA'}];
 const FOOD_CATS=['trattoria','osteria','ristorante','agriturismo','agrispa','rifugio'];
 const DISC={items:[],state:'idle',sig:'',layer:null,
-  cats:LS.get('motorotta_disc_cats',['ristorante','agriturismo']),radius:LS.get('motorotta_disc_r',5),where:'route',sr:LS.get('motorotta_disc_sr',10),pick:false};
+  cats:LS.get('motorotta_disc_cats',['ristorante','agriturismo']),radius:LS.get('motorotta_disc_r',5),where:'route',sr:[0.5,1,2,5].includes(LS.get('motorotta_disc_sr',2))?LS.get('motorotta_disc_sr',2):2,pick:false};
 const discStops=()=>S.stops.map((x,i)=>({i,x})).filter(o=>o.x.p).map(o=>({i:o.i,lab:o.i===0?'P':o.i===S.stops.length-1?'🏁':String(o.i),name:(o.x.p.name||o.x.text||'').split(',')[0],p:[o.x.p.lat,o.x.p.lon]}));
 const RATE_KEY='motorotta_poi_rates';
 const SEL_KEY='motorotta_poi_sel';const sels=()=>LS.get(SEL_KEY,{});
@@ -2068,9 +2091,10 @@ function renderDisc(){
     <button id="discPick" class="${DISC.pick?'okb':''}" style="margin-top:6px;width:100%">${DISC.pick?'👆 Tocca il numero della tappa sulla mappa… (annulla)':'👆 Scegli la tappa toccandola sulla mappa'}</button>
     <div class="row" style="margin-top:8px;align-items:center"><span class="mut">${DISC.where==='route'?'Distanza dal percorso':'Raggio intorno alla tappa'}</span>
       ${DISC.where==='route'?`<select id="discR" style="width:auto;flex:1">${[2,5,10].map(k=>`<option value="${k}" ${DISC.radius===k?'selected':''}>entro ${k} km</option>`).join('')}</select>`
-        :`<select id="discSR" style="width:auto;flex:1">${[5,10,20].map(k=>`<option value="${k}" ${DISC.sr===k?'selected':''}>entro ${k} km</option>`).join('')}</select>`}</div>
+        :`<select id="discSR" style="width:auto;flex:1">${[0.5,1,2,5].map(k=>`<option value="${k}" ${DISC.sr===k?'selected':''}>entro ${k<1?k*1000+' m':k+' km'}</option>`).join('')}</select>`}</div>
     <button id="discGo" class="primary">${DISC.state==='loading'?'⏳ Cerco…':cur?'3. Cerca intorno a '+esc(cur.name):'3. Cerca lungo il percorso'}</button>
     <div class="note" style="margin-top:6px">Dati da OpenStreetMap: indirizzi, telefoni e orari non sono sempre presenti. Voti e prezzi: i tuoi personali (e quelli degli amici che condividono il percorso) + link alle recensioni su Google Maps. ${DISC.where==='route'?'Ristoranti, trattorie e osterie: entro max 5 km dal percorso.':'Cercare intorno a una tappa è molto più veloce che su tutto il percorso.'}</div></div>`;
+  h+=hdCardHTML();
   if(!r&&DISC.where==='route')h+='<div class="card empty">Calcola prima un percorso, oppure scegli una tappa.</div>';
   else if(DISC.state==='error')h+='<div class="card empty">Ricerca non riuscita (server dei dati lento): riprova tra poco o riduci il raggio.</div>';
   else if(DISC.state==='done'&&DISC.sig!==routeSig())h+='<div class="card empty">Filtri cambiati: premi “Cerca”.</div>';
@@ -2080,7 +2104,7 @@ function renderDisc(){
       const st=DISC.stopsKm||[];const groups={};DISC.items.forEach(i=>(groups[i.seg]=groups[i.seg]||[]).push(i));
       Object.keys(groups).sort((a,b)=>a-b).forEach(g=>{
         const a=st[+g],b=st[+g+1];
-        h+=`<div class="card"><h3>${DISC.around?'📍 Intorno a '+esc(DISC.around.name)+' (entro '+DISC.sr+' km) · '+DISC.items.length+' luoghi':a&&b?esc(a.name)+' → '+esc(b.name):'Lungo il percorso'}</h3>`+groups[g].sort((x,y)=>x.km-y.km).map(i=>{
+        h+=`<div class="card"><h3>${DISC.around?'📍 Intorno a '+esc(DISC.around.name)+' (entro '+(DISC.sr<1?DISC.sr*1000+' m':DISC.sr+' km')+') · '+DISC.items.length+' luoghi':a&&b?esc(a.name)+' → '+esc(b.name):'Lungo il percorso'}</h3>`+groups[g].sort((x,y)=>x.km-y.km).map(i=>{
           const c=catOf(i.cat),rt=rates()[i.key];
           return `<div class="sv" data-poi="${i.key}" style="cursor:pointer"><div style="font-size:22px;width:30px;text-align:center">${c.ic}</div><div class="n"><b>${esc(i.name)}</b> ${rateBadge(rt)}
             <div class="mut">${c.s}${i.t.ele?' · '+Math.round(parseFloat(i.t.ele))+' m s.l.m.':''} · km ${Math.round(i.km)}${i.near?' · vicino a '+esc(i.near):''} · ${i.off<1000?Math.round(i.off)+' m':(i.off/1000).toFixed(1)+' km'} ${DISC.around?'da '+esc(DISC.around.name):'dal percorso'}${closedDays(i.t.opening_hours)?' · chiuso '+closedDays(i.t.opening_hours):''}</div></div><span class="mut">›</span></div>`;}).join('')+'</div>';
@@ -2090,7 +2114,7 @@ function renderDisc(){
   box.innerHTML=h;
   box.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{const k=b.dataset.k;DISC.cats=DISC.cats.includes(k)?DISC.cats.filter(x=>x!==k):[...DISC.cats,k];LS.set('motorotta_disc_cats',DISC.cats);renderDisc();});
   if($('#discR'))$('#discR').onchange=e=>{DISC.radius=+e.target.value;LS.set('motorotta_disc_r',DISC.radius);renderDisc();};
-  $('#discGo').onclick=()=>{if(DISC.state!=='loading')discSearch();};
+  $('#discGo').onclick=()=>{if(DISC.state!=='loading')discSearch();};hdBind();
   $('#discW').onchange=e=>{DISC.where=e.target.value==='route'?'route':+e.target.value;DISC.pick=false;renderDisc();drawStopMarkers();};
   $('#discPick').onclick=()=>{DISC.pick=!DISC.pick;renderDisc();if(DISC.pick){toast('Tocca il numero di una tappa sulla mappa');window.scrollTo({top:0,behavior:'smooth'});}};
   if($('#discSR'))$('#discSR').onchange=e=>{DISC.sr=+e.target.value;LS.set('motorotta_disc_sr',DISC.sr);renderDisc();};
@@ -2484,6 +2508,34 @@ addEmCtl(map);
   const j=JSON.parse(decodeURIComponent(escape(atob(h.slice(5).replace(/-/g,'+').replace(/_/g,'/')))));
   if(!confirm('Importare i dati personali (contatti SOS, Road Captain, assicurazione) su questo iPhone?'))return;
   if(Array.isArray(j.contacts))SET.contacts=j.contacts.slice(0,5);if(Array.isArray(j.rc))SET.rc=j.rc;if(j.ins)SET.ins=j.ins;if(j.sosMsg)SET.sosMsg=j.sosMsg;saveSet();toast('✅ Dati personali importati');}catch(e){toast('Link dati non valido');}})();
+
+/* ================= concessionarie Harley-Davidson (HDI Italia / HDE Europa) ================= */
+let HDDB=null,HDL=null;const HD={mode:LS.get('motorotta_hd','')};
+async function loadHD(){if(HDDB)return HDDB;
+  try{const r=await fetch(DATA_BASE+'hd.json',{cache:'no-cache'});if(r.ok){const j=await r.json();HDDB=j.d.map((x,i)=>({p:[x[0],x[1]],name:x[2],city:x[3],cc:x[4],tel:x[5],web:x[6],key:'hd'+i}));return HDDB;}}catch(e){}
+  try{const j=await overpass('[out:json][timeout:60];(nwr(34,-11,71.5,41)["shop"~"^motorcycle"]["brand"~"harley",i];nwr(34,-11,71.5,41)["shop"~"^motorcycle"]["name"~"harley",i];);out tags center;');
+    HDDB=(j.elements||[]).map((e,i)=>{const t=e.tags||{};return {p:[e.lat??e.center.lat,e.lon??e.center.lon],name:t.name||'Harley-Davidson',city:t['addr:city']||'',cc:(t['addr:country']||'').toUpperCase(),tel:t.phone||t['contact:phone']||'',web:t.website||t['contact:website']||'',key:'hd'+i};});
+    HDDB.forEach(x=>{if(!x.cc&&inItaly(x.p))x.cc='IT';});return HDDB;}catch(e){return null;}}
+const hdList=()=>(HDDB||[]).filter(x=>HD.mode==='eu'||(HD.mode==='it'&&(x.cc==='IT'||(!x.cc&&inItaly(x.p)))));
+function hdIcon(){return L.divIcon({className:'',html:'<div style="background:#111;color:#ff7a1a;border:2px solid #ff7a1a;border-radius:8px;padding:2px 5px;font:900 12px/14px -apple-system,sans-serif;box-shadow:0 1px 4px rgba(0,0,0,.5);white-space:nowrap">H-D</div>',iconSize:[38,22],iconAnchor:[19,11]});}
+function hdPopup(x){return `<b>🏍️ ${esc(x.name)}</b>${x.city?'<br>'+esc(x.city):''}${x.tel?`<br><a href="${telOf(x.tel)}">📞 ${esc(x.tel)}</a>`:''}${x.web?`<br><a href="${esc(x.web)}" target="_blank" rel="noopener">🌐 Sito</a>`:''}<br><button class="okb" style="margin-top:6px" data-addhd="${x.key}">➕ Aggiungi come tappa</button>`;}
+function addHdStop(x,ctx){const stop={p:{lat:x.p[0],lon:x.p[1],name:'🏍️ '+x.name},text:x.name};
+  if(ctx==='nav'&&NAV.active)navInsertStop(stop,x.name);else{const i=bestInsert(x.p);S.stops.splice(i,0,stop);renderStops();toast('🏍️ '+x.name+' aggiunta come tappa: ricalcolo');calc();}}
+async function drawHD(){try{if(!HDL)HDL=L.layerGroup().addTo(map);HDL.clearLayers();if(!HD.mode)return;await loadHD();
+  hdList().forEach(x=>{const mk=L.marker(x.p,{icon:hdIcon(),zIndexOffset:300}).bindPopup(()=>hdPopup(x));
+    mk.on('popupopen',ev=>{const b=ev.popup.getElement()&&ev.popup.getElement().querySelector('[data-addhd]');if(b)b.onclick=()=>{map.closePopup();addHdStop(x,'plan');};});HDL.addLayer(mk);});}catch(e){}}
+function hdCardHTML(){const r=S.routes[S.sel];let list='';
+  if(HD.mode&&HDDB){const L1=hdList().map(x=>({...x,d:r?projKm(r,x.p).d:hav([map.getCenter().lat,map.getCenter().lng],x.p)})).sort((a,b)=>a.d-b.d).slice(0,10);
+    list=`<div class="mut" style="margin:6px 0">${hdList().length} concessionarie ${HD.mode==='it'?'in Italia':'in Europa'} sulla mappa · le più vicine ${r?'al percorso':'alla mappa'}:</div>`+
+      L1.map(x=>`<div class="sv"><div style="font-size:20px">🏍️</div><div class="n"><b>${esc(x.name)}</b><div class="mut">${esc(x.city||'')}${x.city?' · ':''}${(x.d/1000).toFixed(1)} km ${r?'dal percorso':''}${x.tel?' · '+esc(x.tel):''}</div></div><button class="ib" data-hdadd="${x.key}">➕ tappa</button></div>`).join('');}
+  else if(HD.mode)list='<div class="empty">⏳ Carico le concessionarie…</div>';
+  return `<div class="card"><h3>🏍️ Concessionarie Harley-Davidson</h3><div class="row">
+    <button id="hdIt" class="${HD.mode==='it'?'okb':''}" style="flex:1;font-weight:800">HDI 🇮🇹 Italia</button><button id="hdEu" class="${HD.mode==='eu'?'okb':''}" style="flex:1;font-weight:800">HDE 🇪🇺 Europa</button></div>
+    ${list}<div class="note">Tocca “H-D” sulla mappa o “➕ tappa” per inserirla nel percorso. Elenco da OpenStreetMap, aggiornato ogni settimana: qualche concessionaria potrebbe mancare.</div></div>`;}
+function hdBind(){const set=m=>{HD.mode=HD.mode===m?'':m;LS.set('motorotta_hd',HD.mode);renderDisc();drawHD().then(()=>renderDisc());if(HD.mode){toast(HD.mode==='it'?'HDI: concessionarie in Italia':'HDE: concessionarie in Europa');try{map.setView(HD.mode==='it'?[42.3,12.6]:[48,10],HD.mode==='it'?6:4);}catch(e){}}};
+  if($('#hdIt'))$('#hdIt').onclick=()=>set('it');if($('#hdEu'))$('#hdEu').onclick=()=>set('eu');
+  document.querySelectorAll('[data-hdadd]').forEach(b=>b.onclick=()=>{const x=(HDDB||[]).find(y=>y.key===b.dataset.hdadd);if(x)addHdStop(x,'plan');});}
+setTimeout(()=>{if(HD.mode)drawHD();},1500);
 
 /* ================= giorni buoni per guidare ================= */
 let gdLoaded=0;
