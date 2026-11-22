@@ -238,7 +238,7 @@ input[type=datetime-local]{width:100%;min-width:0;-webkit-appearance:none;appear
 
   <div class="foot">
     Mappe © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · Percorsi: Valhalla (profilo moto, server FOSSGIS) e OSRM (Open Source Routing Machine) · Ricerca luoghi: Photon · Meteo: <a href="https://open-meteo.com/">Open-Meteo</a> (modelli ECMWF/ICON/GFS).<br>
-    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">VERSIONE DI PROVA = rilascio 21</b>
+    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">VERSIONE DI PROVA = rilascio 22</b>
   </div>
 </main>
 </div>
@@ -1805,7 +1805,7 @@ function stopNav(silent){
   $('#navCard').style.display='none';navStartCardUI();
   if(!silent)speak('Navigazione terminata.');
 }
-function navMapInit(){
+function navMapInit(){NAV.drawSig=null;NAV.meMk=null;NAV.meLayer=null;
   if(NAV.mapI){NAV.mapI.remove();NAV.mapI=null;}
   try{NAV.mapI=L.map('nmap',{zoomControl:false,attributionControl:false,doubleClickZoom:false,rotate:true,touchRotate:false,rotateControl:false,bearing:0});
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(NAV.mapI);
@@ -1821,9 +1821,14 @@ function navBack(){clearTimeout(NAV.backT);NAV.follow=true;$('#recenter').style.
 function navHeading(i){const c=NAV.coords;if(!c.length)return 0;let j=i,d=0;while(j<c.length-1&&d<60){d+=hav(c[j],c[j+1]);j++;}return j>i?bearing(c[i],c[j]):0;}
 function navFollow(pr){
   if(!NAV.mapI||!NAV.follow||!NAV.me)return;
-  let z=RD.v*3.6>90?14:15;const nm=pr?nextMan(pr):null;if(nm&&nm.dist<350)z=17;else if(nm&&nm.dist<800)z=16;
-  try{if(NAV.mapI.setBearing&&pr)NAV.mapI.setBearing(-navHeading(pr.i));NAV.mapI.setView(NAV.me,z,{animate:false});}catch(e){}
+  const z=navZoom(pr);
+  try{if(NAV.mapI.setBearing&&pr)NAV.mapI.setBearing(-navHeading(pr.i));NAV.mapI.setView(NAV.me,z,{animate:true,duration:0.6});}catch(e){}
 }
+function navZoom(pr,d3){ // zoom automatico: più vicino agli incroci, anche dopo averli superati da poco
+  const ve=RD.v;let z=RD.v*3.6>90?14:15;const nm=pr?nextMan(pr):null;
+  if(nm){if(nm.dist<Math.max(350,ve*12))z=17;else if(nm.dist<Math.max(900,ve*30))z=16;}
+  try{const prev=(NAV.man||[]).filter(x=>x.i<=pr.i&&x.type!==1&&x.type!==2&&x.type!==3).pop();if(prev&&pr.along-NAV.cum[prev.i]<Math.max(120,ve*4))z=Math.max(z,17);}catch(e){}
+  return d3?z+0.5:z;}
 function nextMan(pr){const m=(NAV.man||[]).find(x=>x.i>pr.i&&x.type!==1&&x.type!==2&&x.type!==3);if(!m)return null;
   return {m,dist:Math.max(0,NAV.cum[Math.min(m.i,NAV.cum.length-1)]-pr.along)};}
 const MAN_ARR={0:'↑',8:'↑',22:'↑',17:'↑',9:'↗',10:'→',11:'↘',12:'⤸',13:'⤹',14:'↙',15:'←',16:'↖',18:'↗',19:'↖',20:'↗',21:'↖',23:'↗',24:'↖',25:'⤴',26:'⟳',27:'⟳',4:'🏁',5:'🏁',6:'🏁',28:'⛴',29:'⛴'};
@@ -1843,7 +1848,10 @@ function showAlert(txt,say){const b=$('#alertBanner');b.innerHTML=txt;b.classLis
 function fuelBigHTML(col,name){const z=col==='#e60000'?40:32;return `<div style="display:flex;flex-direction:column;align-items:center;width:150px;pointer-events:none"><div style="width:${z}px;height:${z}px;border-radius:50%;background:${col};border:3px solid #fff;box-shadow:0 0 0 2px #111,0 2px 6px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;font-size:${Math.round(z*0.55)}px">⛽</div><div class="pslab" style="font-size:12px;margin-top:2px">${esc((name||'').slice(0,28))}</div></div>`;}
 function fuelBigIcon(col,name){return L.divIcon({className:'',html:fuelBigHTML(col,name),iconSize:[150,60],iconAnchor:[75,20]});}
 function navDraw(){
-  if(!NAV.mapI||!NAV.layers)return;NAV.layers.clearLayers();
+  if(!NAV.mapI||!NAV.layers)return;
+  const sig=[NAV.coords.length,NAV.coords[0]&&NAV.coords[0].join(),NAV.coords===NAV._cref,S.ev[S.sel]===NAV._eref,NAV.next,NAV.stops.map(x=>x.state).join(),Object.keys(sels()).length,S.fuelState,(S.routes[S.sel]&&S.routes[S.sel].fuelSt||[]).length,SET.fatigue].join('|');
+  NAV._cref=NAV.coords;NAV._eref=S.ev[S.sel];
+  if(sig!==NAV.drawSig){NAV.layers.clearLayers();
   L.polyline(NAV.coords,{color:'#0b3d6e',weight:11,opacity:.35}).addTo(NAV.layers);
   L.polyline(NAV.coords,{color:'#1e9bff',weight:7}).addTo(NAV.layers);
   try{const ev=S.ev[S.sel];if(ev)ev.pts.forEach((p,i)=>{const nx=ev.pts[i+1];if(!nx)return;const lvl=Math.max(riskOf(p).lvl,riskOf(nx).lvl);if(!lvl)return;
@@ -1855,8 +1863,13 @@ function navDraw(){
   NAV.stops.forEach((s,k)=>{const col=s.state==='done'?'#3ecf6e':s.state==='skipped'?'#777':k===NAV.next?'#ff7a1a':'#fff';
     L.circleMarker([s.p.lat,s.p.lon],{radius:k===NAV.next?9:7,color:'#111',weight:2,fillColor:col,fillOpacity:1}).bindTooltip(s.name).addTo(NAV.layers);});
   Object.values(sels()).forEach(v=>L.marker(v.p,{icon:L.divIcon({className:'',html:`<div style="background:#fff;border:2px solid #f26b00;border-radius:12px;padding:1px 4px;font-size:15px">📌${catOf(v.cat).ic}</div>`,iconSize:[44,24],iconAnchor:[22,12]})}).addTo(NAV.layers));
-  if(NAV.me)L.marker(NAV.me,{icon:L.divIcon({className:'',html:'<div style="width:26px;height:26px;border-radius:50%;background:#ff7a1a;border:3px solid #fff;box-shadow:0 0 6px rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px">▲</div>',iconSize:[26,26],iconAnchor:[13,13]})}).addTo(NAV.layers);
+  NAV.drawSig=sig;}
+  navDrawMe();
 }
+function navDrawMe(){if(!NAV.mapI||!NAV.me)return;
+  if(!NAV.meLayer||NAV.meLayer._map!==NAV.mapI)NAV.meLayer=L.layerGroup().addTo(NAV.mapI);
+  if(!NAV.meMk||!NAV.meLayer.hasLayer(NAV.meMk)){NAV.meLayer.clearLayers();NAV.meMk=L.marker(NAV.me,{zIndexOffset:2000,interactive:false,icon:L.divIcon({className:'',html:'<div style="width:26px;height:26px;border-radius:50%;background:#ff7a1a;border:3px solid #fff;box-shadow:0 0 6px rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px">▲</div>',iconSize:[26,26],iconAnchor:[13,13]})}).addTo(NAV.meLayer);}
+  else NAV.meMk.setLatLng(NAV.me);}
 function navStatus(t,col){const e=$('#navStatus');e.innerHTML=t;e.style.background=col||'#16351f';}
 function navUI(pr){
   const n=NAV.stops[NAV.next];const last=NAV.stops[NAV.stops.length-1];
@@ -2262,7 +2275,10 @@ function fuelNowL(){return rangeNow()*effCons().c/100;}
 function pointAtKm(r,km){const d=km*1000;let j=r.cum.findIndex(x=>x>=d);if(j<0)j=r.coords.length-1;return r.coords[j];}
 const fuelTier=x=>x.off<=300?1:x.off<=1500?2:3;
 const TIER_TXT=['','sul percorso','piccola deviazione','fuori percorso'];
-function fuelPlan(r){
+const FPMEMO=new WeakMap();
+function fuelPlan(r){if(!r)return fuelPlanCalc(r);let k;try{k=[rangeNow(),fullRange(),V().id,V().resHi,V().resLo,V().adv,V().fuel,(r.fuelSt||[]).length,(r.fuelFar||[]).length,S.dep,S.fuelState,effCons().c,r.len].join('|');}catch(e){return fuelPlanCalc(r);}
+  const m=FPMEMO.get(r);if(m&&m.k===k)return m.v;const v=fuelPlanCalc(r);FPMEMO.set(r,{k,v});return v;}
+function fuelPlanCalc(r){
   const e=effCons(),c=e.c,tot=r.len/1000,full=fullRange(),V0=V();
   const HI=V0.resHi||150,LO=V0.resLo||120,ADV=V0.adv??30,M=LO;
   const fu=V0.fuel;const okF=x=>fu==='gpl'?(x.lpg==='yes'):fu==='metano'?(x.cng==='yes'):fu==='diesel'?x.diesel!=='no':x.o95!=='no';
@@ -2764,7 +2780,7 @@ function m3Data(){const m=M3.map;if(!m||!M3.ready)return;
 function m3Sync(pr,force){if(!M3.on||!M3.map||!M3.ready)return;
   if(force||M3.cref!==NAV.coords||M3.eref!==S.ev[S.sel])m3Data();
   if(NAV.me){M3.me.setLngLat(ll(NAV.me));const hd=pr?navHeading(pr.i):0;M3.me.setRotation(hd);
-    if(NAV.follow){let z=RD.v*3.6>90?15:16;const nm=pr?nextMan(pr):null;if(nm&&nm.dist<350)z=17.5;else if(nm&&nm.dist<800)z=16.5;
+    if(NAV.follow){const z=pr?navZoom(pr,true):16;
       M3.map.easeTo({center:ll(NAV.me),bearing:hd,pitch:62,zoom:z,duration:900,padding:{top:Math.round(M3.map.getContainer().clientHeight*0.35)}});}}}
 async function m3Set(on){M3.on=on;LS.set('motorotta_3d',on);M3.btns.forEach(b=>{b.textContent=on?'2D':'3D';});
   document.body.classList.toggle('m3',on);
@@ -2920,7 +2936,7 @@ autoStart();
 if(location.hash.startsWith('#r')){try{applyPayload(b64d(location.hash.slice(2)));calc();}catch(e){console.warn(e);}}
 
 /* ================= aggiornamento automatico dell'app ================= */
-const APP_REL=21;
+const APP_REL=22;
 async function checkUpdate(){
   try{const r=await fetch('version.txt?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=parseInt((await r.text()).trim(),10);
     if(v>APP_REL){const k='motorotta_upd_try';if(LS.get(k,0)===v)return;LS.set(k,v);toast('⬇️ Nuova versione disponibile: aggiorno l’app…');
