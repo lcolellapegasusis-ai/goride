@@ -8,17 +8,17 @@ permissions:
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - name: Strumenti
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq osmium-tool
-          pip install -q osmium
+          pip install -q osmium shapely
       - name: Scarica estratti Geofabrik e filtra
         run: |
           mkdir -p /tmp/osm && cd /tmp/osm
-          for r in europe/italy europe/switzerland europe/austria europe/slovenia europe/liechtenstein europe/alps; do
+          for r in europe/italy europe/switzerland europe/austria europe/slovenia europe/liechtenstein europe/france europe/spain europe/germany/bayern europe/alps; do
             f=$(basename $r)
             curl -sSfL --retry 3 -o $f.pbf https://download.geofabrik.de/$r-latest.osm.pbf || { echo "salto $f"; continue; }
             osmium tags-filter -R -O -o $f-f.pbf $f.pbf n/mountain_pass=yes w/highway && rm $f.pbf
@@ -27,7 +27,7 @@ jobs:
       - name: Elenco passi
         run: |
           args=""
-          for p in IT:italy CH:switzerland AT:austria SI:slovenia LI:liechtenstein :alps; do
+          for p in IT:italy CH:switzerland AT:austria SI:slovenia LI:liechtenstein FR:france ES:spain DE:bayern :alps; do
             f=/tmp/osm/${p#*:}-f.pbf; [ -f $f ] && args="$args ${p%%:*}:$f"
           done
           python3 tools/update_passes.py $args

@@ -238,7 +238,7 @@ input[type=datetime-local]{width:100%;min-width:0;-webkit-appearance:none;appear
 
   <div class="foot">
     Mappe © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · Percorsi: Valhalla (profilo moto, server FOSSGIS) e OSRM (Open Source Routing Machine) · Ricerca luoghi: Photon · Meteo: <a href="https://open-meteo.com/">Open-Meteo</a> (modelli ECMWF/ICON/GFS).<br>
-    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">VERSIONE DI PROVA = rilascio 22</b>
+    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">VERSIONE DI PROVA = rilascio 23</b>
   </div>
 </main>
 </div>
@@ -1324,9 +1324,9 @@ const PASS_AREAS=[['route','Lungo il percorso calcolato (entro 30 km)'],['near',
 const PASSC={};
 async function loadPasses(area){
   if(PASSC[area])return PASSC[area];
-  const db=area.length===5&&area.includes('-')?null:await loadPassDB();
+  const db0=await loadPassDB();const isReg=area.startsWith('IT-');const db=db0&&(!isReg||db0.some(x=>x.reg))?db0:null;
   if(db){let out;if(area==='route'){const r=S.routes[S.sel];if(!r)throw new Error('calcola prima un percorso');const bb=L.latLngBounds(r.coords).pad(0.05);const la=0.3,lo=0.4;out=db.filter(x=>x.p[0]>bb.getSouth()-la&&x.p[0]<bb.getNorth()+la&&x.p[1]>bb.getWest()-lo&&x.p[1]<bb.getEast()+lo&&projKm(r,x.p).d<30000);}
-    else if(area==='near'){const c=map.getCenter();out=db.filter(x=>hav([c.lat,c.lng],x.p)<80000);}else out=db.filter(x=>x.cc===area);
+    else if(area==='near'){const c=map.getCenter();out=db.filter(x=>hav([c.lat,c.lng],x.p)<80000);}else out=db.filter(x=>isReg?x.reg===area:x.cc===area);
     if(out.length||area==='route'||area==='near'){PASSC[area]=out;return out;}}
   const road='["highway"~"^(motorway|trunk|primary|secondary|tertiary|unclassified|residential)$"]';
   let src;
@@ -1363,7 +1363,7 @@ function openPasses(){
       const i=bestInsert(x.p);S.stops.splice(i,0,{p:{lat:x.p[0],lon:x.p[1],name:x.name+(x.ele?' ('+Math.round(x.ele)+' m)':'')},text:x.name});
       renderStops();sh.classList.remove('on');try{map.setView(x.p,11);}catch(err){}toast('🏔️ '+x.name+' aggiunto come tappa: ricalcola il percorso');window.scrollTo({top:0,behavior:'smooth'});});};
   const load=async()=>{const a=$('#psArea').value;if(a==='route'||a==='near')delete PASSC[a];LS.set('motorotta_pass_area',a);$('#psList').innerHTML='<div class="empty">⏳ Carico i passi…</div>';
-    try{await loadPasses(a);draw();}catch(e){$('#psList').innerHTML=`<div class="empty">Non riesco a caricare i passi (${esc(e.message||'rete')}). Riprova.</div>`;}};
+    try{await loadPasses(a);draw();}catch(e){$('#psList').innerHTML=`<div class="empty">Il server delle mappe è lento in questo momento. Prova “Vicino alla zona della mappa” o “Lungo il percorso”, che sono immediati, oppure riprova tra poco.</div>`;}};
   $('#psArea').onchange=load;$('#psQ').oninput=draw;$('#psSort').onchange=draw;load();
 }
 $('#passBtn').onclick=openPasses;
@@ -1374,7 +1374,7 @@ let PASSDB=null,PASSDB_TRY=0;const PASSWX={},ONR=new WeakMap();
 async function loadPassDB(){
   if(PASSDB)return PASSDB;if(Date.now()-PASSDB_TRY<300000)return null;PASSDB_TRY=Date.now();
   try{const r=await fetch(DATA_BASE+'passes.json',{cache:'no-cache'});if(!r.ok)return null;const j=await r.json();
-    PASSDB=j.p.map((x,i)=>({p:[x[0],x[1]],name:x[2],ele:x[3]||null,cc:x[4]||'',key:'d'+i}));return PASSDB;}catch(e){return null;}
+    PASSDB=j.p.map((x,i)=>({p:[x[0],x[1]],name:x[2],ele:x[3]||null,cc:x[4]||'',reg:x[5]||'',key:'d'+i}));return PASSDB;}catch(e){return null;}
 }
 async function passesInView(m){
   const b=m.getBounds().pad(0.1);const db=await loadPassDB();
@@ -2936,7 +2936,7 @@ autoStart();
 if(location.hash.startsWith('#r')){try{applyPayload(b64d(location.hash.slice(2)));calc();}catch(e){console.warn(e);}}
 
 /* ================= aggiornamento automatico dell'app ================= */
-const APP_REL=22;
+const APP_REL=23;
 async function checkUpdate(){
   try{const r=await fetch('version.txt?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=parseInt((await r.text()).trim(),10);
     if(v>APP_REL){const k='motorotta_upd_try';if(LS.get(k,0)===v)return;LS.set(k,v);toast('⬇️ Nuova versione disponibile: aggiorno l’app…');
