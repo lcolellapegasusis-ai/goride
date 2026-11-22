@@ -238,7 +238,7 @@ input[type=datetime-local]{width:100%;min-width:0;-webkit-appearance:none;appear
 
   <div class="foot">
     Mappe © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · Percorsi: Valhalla (profilo moto, server FOSSGIS) e OSRM (Open Source Routing Machine) · Ricerca luoghi: Photon · Meteo: <a href="https://open-meteo.com/">Open-Meteo</a> (modelli ECMWF/ICON/GFS).<br>
-    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">Versione 22 nov 2026 · rilascio 23 (passi per regione immediati)</b>
+    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">Versione 22 nov 2026 · rilascio 24 (Scopri per punto, tappe dalla mappa)</b>
   </div>
 </main>
 </div>
@@ -358,10 +358,10 @@ input[type=datetime-local]{width:100%;min-width:0;-webkit-appearance:none;appear
     <div class="note" style="margin-top:8px">In caso di urto violento seguito da arresto, GoRide &amp; Weather suona un allarme e mostra un conto alla rovescia di 30 secondi. Se non tocchi “Sto bene”, prepara un SMS con la tua posizione per il contatto di emergenza: l’invio va confermato con un tocco (una web app non può inviare SMS da sola).</div>
   </div>
   <div class="card"><h3>📖 Istruzioni per l’uso</h3>
-<details class="howto"><summary>1 · Preparare un percorso</summary><div>In <b>Pianifica</b> scrivi partenza e destinazione (o tocca 📍 Io). Aggiungi tappe con <b>＋ Tappa</b>, con <b>✋ Tappe sulla mappa</b> (tocchi la mappa) o con <b>🏔️ Passi di montagna</b>. Scegli il tipo di percorso (più veloce, misto, senza autostrade, più curve…), la data e l’ora, poi <b>Calcola percorso e meteo</b>. Il percorso viene salvato da solo dopo 8 secondi, a meno che tu tocchi <b>NO</b>.</div></details>
+<details class="howto"><summary>1 · Preparare un percorso</summary><div>In <b>Pianifica</b> scrivi partenza e destinazione (o tocca 📍 Io). Aggiungi tappe con <b>＋ Tappa</b>, con <b>🗺️</b> accanto a ogni campo (ingrandisci la mappa e tocchi due volte il punto), con <b>✋ Tappe sulla mappa</b> (tocchi la mappa) o con <b>🏔️ Passi di montagna</b>. Scegli il tipo di percorso (più veloce, misto, senza autostrade, più curve…), la data e l’ora, poi <b>Calcola percorso e meteo</b>. Il percorso viene salvato da solo dopo 8 secondi, a meno che tu tocchi <b>NO</b>.</div></details>
 <details class="howto"><summary>2 · Leggere il percorso</summary><div>Strada <b style="color:#1e9bff">azzurra</b> = ok, <b style="color:#ff9500">arancione</b> = sconsigliato (freddo, pioviggine, vento), <b style="color:#e60000">rossa</b> = pericolo (ghiaccio, neve, temporale, pioggia forte, raffiche, nebbia). Tocca la strada per il motivo. In <b>Percorsi</b> trovi: tratti a rischio, orario migliore di partenza, carburante e soste, <b>📋 riepilogo</b> con costi e pedaggi stimati (andata e andata+ritorno).</div></details>
 <details class="howto"><summary>3 · Pulsanti sulla mappa</summary><div><b>A destra:</b> 🏔️ passi (verde = ok, rosso = neve/gelo), ⛽ grigio = tutti i distributori del percorso, ⛽ azzurro = distributori vicino a te (secondo tocco li nasconde).<br><b>A sinistra:</b> 🔔 soccorso stradale (assicurazione, ACI 803.116, soccorso vicino), 📱 Road Captain, SOS (112 e messaggio ai contatti).<br>⛽ rosso grande = sosta carburante scelta, ⛽ azzurro = riserva.</div></details>
-<details class="howto"><summary>4 · Scopri</summary><div>In cima: concessionarie <b>HDI</b> (Italia) e <b>HDE</b> (Europa). Poi scegli cosa cercare (ristoranti, agriturismi, castelli…), <b>dove</b> (tutto il percorso o una tappa: dal menu o toccandone il numero sulla mappa) e il <b>raggio</b> (500 m – 5 km), quindi <b>Cerca</b>. Tocca un luogo per dettagli, voto personale e “📌 seleziona” o “➕ tappa”.</div></details>
+<details class="howto"><summary>4 · Scopri</summary><div>In cima: concessionarie <b>HDI</b> (Italia) e <b>HDE</b> (Europa). Poi scegli cosa cercare (ristoranti, agriturismi, castelli…), <b>dove</b>: vicino a te (200 m, allargabile a 500 m), un luogo scritto per nome, oppure una tappa (dal menu o toccandone il numero sulla mappa); il <b>raggio</b> (500 m, 1, 2 o 5 km), quindi <b>Cerca</b>. Mostro i 30 risultati più vicini. Tocca un luogo per dettagli, voto personale e “📌 seleziona” o “➕ tappa”.</div></details>
 <details class="howto"><summary>5 · Navigare</summary><div><b>▶︎ Naviga con GoRide</b> (scheda Percorsi). Mappa orientata nella direzione di marcia, voce per svolte, meteo, pericoli e distributori. Doppio tocco = zoom (torna dopo 5 s). Se esci di strada o fai una deviazione, l’app ti riporta sull’<b>itinerario originale</b> nel punto più vicino davanti a te. Il viaggio resta in memoria se chiudi l’app (“Riprendi”).<br><b>🎬 Simula navigazione</b> (scheda Percorsi) prova il giro da fermo a velocità ×1, ×4 o ×10.</div></details>
 <details class="howto"><summary>6 · Comandi vocali</summary><div>In navigazione tocca 🎤 (in basso a sinistra sulla mappa) e di’ un comando: <b>distributore, soccorso, meteo, pericoli, traffico, salta tappa, ricalcola, SOS, chiama</b> + nome del Road Captain. L’app risponde “Ho capito…” e lo esegue. Con l’opzione sperimentale “Ascolto continuo” basta dire <b>“GoRide”</b> + comando. Dall’interfono puoi sempre usare Siri per telefonare (“Ehi Siri, chiama il 112”).</div></details>
 <details class="howto"><summary>7 · Sicurezza</summary><div>In Impost.: 5 contatti SOS e il tuo messaggio, assicurazione, Road Captain. L’allarme caduta parte durante la registrazione/navigazione: 30 s per toccare “Sto bene”, poi SMS pronto con indirizzo e posizione (serve un tocco su Invia). Per l’invio <b>automatico</b> tieni attivo il <b>Rilevamento incidenti di iPhone</b>.</div></details>
@@ -457,9 +457,25 @@ function drawStopMarkers(){try{if(!stopLayer)stopLayer=L.layerGroup().addTo(map)
     mk.on('click',()=>{if(typeof DISC==='undefined'||!DISC.pick)return;DISC.where=i;DISC.pick=false;drawStopMarkers();showTab('disc');renderDisc();
       toast('📍 Tappa scelta: '+(x.p.name||'').split(',')[0]+' — ora premi “Cerca”');const t=$('#tab-disc');if(t)t.scrollIntoView({behavior:'smooth',block:'start'});});
     mk.addTo(stopLayer);});}catch(e){}}
+/* scelta di una tappa dalla mappa: doppio tocco sul punto */
+let PICK={t:0,pt:null};
+function stopMapPick(i){if(S.tapMode)setTapMode(false);S.mapPick=i;PICK={t:0,pt:null};try{map.doubleClickZoom.disable();}catch(e){}
+  let b=$('#pickBar');if(!b){b=document.createElement('div');b.id='pickBar';b.style.cssText='position:fixed;left:10px;right:10px;top:calc(env(safe-area-inset-top) + 62px);z-index:5000;background:#14181f;color:#fff;border:3px solid #ffd400;border-radius:14px;padding:12px;font-weight:800;font-size:16px;display:flex;gap:10px;align-items:center';document.body.appendChild(b);}
+  const lab=i===0?'Partenza':i===S.stops.length-1?'Destinazione':'Tappa '+i;
+  b.innerHTML=`<span style="flex:1">🗺️ ${lab}: ingrandisci la mappa e tocca <u>due volte</u> il punto</span><button id="pickX" style="background:#d10000;color:#fff;border:0">Annulla</button>`;b.style.display='flex';
+  $('#pickX').onclick=()=>stopMapPickEnd(false);window.scrollTo({top:0,behavior:'smooth'});}
+function stopMapPickEnd(ok){S.mapPick=null;try{map.doubleClickZoom.enable();}catch(e){}const b=$('#pickBar');if(b)b.style.display='none';if(!ok)toast('Scelta dalla mappa annullata');}
+async function pickTap(e){const now=Date.now(),pt=e.containerPoint;
+  if(!(PICK.pt&&now-PICK.t<450&&pt.distanceTo(PICK.pt)<35)){PICK={t:now,pt};return;}
+  PICK={t:0,pt:null};const i=S.mapPick;if(i==null||!S.stops[i])return stopMapPickEnd(false);const ll=e.latlng;stopMapPickEnd(true);
+  const mk=L.marker(ll,{icon:L.divIcon({className:'',html:'<div style="font-size:30px;line-height:30px">📍</div>',iconSize:[30,30],iconAnchor:[15,28]})}).addTo(map);setTimeout(()=>mk.remove(),2500);
+  S.stops[i]={p:{lat:ll.lat,lon:ll.lng,name:'…'},text:'…'};renderStops();
+  let nm=null;try{nm=await Promise.race([revName(ll.lat,ll.lng),new Promise(r=>setTimeout(()=>r(null),6000))]);}catch(x){}
+  nm=nm||`Punto ${ll.lat.toFixed(4)}, ${ll.lng.toFixed(4)}`;if(S.stops[i]&&S.stops[i].p&&S.stops[i].p.lat===ll.lat){S.stops[i].p.name=nm;S.stops[i].text=nm;}
+  renderStops();toast('✅ '+(i===0?'Partenza':i===S.stops.length-1?'Destinazione':'Tappa '+i)+': '+nm.split(',')[0]);}
 function setTapMode(on){S.tapMode=on;const b=$('#tapBtn');if(b){b.classList.toggle('okb',on);b.textContent=on?'✋ Tocca la mappa… (fine)':'✋ Tappe sulla mappa';}
   if(on){toast('Tocca la mappa per aggiungere tappe; trascina i numeri per spostarle');window.scrollTo({top:0,behavior:'smooth'});}}
-map.on('click',async e=>{if(!S.tapMode)return;const ll=e.latlng;const p={lat:ll.lat,lon:ll.lng,name:'…'};
+map.on('click',async e=>{if(S.mapPick!=null){pickTap(e);return;}if(!S.tapMode)return;const ll=e.latlng;const p={lat:ll.lat,lon:ll.lng,name:'…'};
   let i;if(!S.stops[0].p)i=0;else if(!S.stops[S.stops.length-1].p)i=S.stops.length-1;else{i=bestInsert([ll.lat,ll.lng]);S.stops.splice(i,0,{p:null,text:''});}
   S.stops[i].p=p;renderStops();p.name=await revName(ll.lat,ll.lng);S.stops[i].text=p.name;renderStops();toast('Tappa aggiunta: '+p.name.split(',')[0]);});
 function renderStops(){setTimeout(drawStopMarkers,0);
@@ -468,6 +484,7 @@ function renderStops(){setTimeout(drawStopMarkers,0);
     const last=i===S.stops.length-1, first=i===0;
     const row=document.createElement('div');row.className='stop';
     row.innerHTML=`<span class="dot">${first?'🟢':last?'🏁':'🔸'}</span><div class="ac"><input type="text" autocomplete="off" placeholder="${first?'Partenza':last?'Destinazione':'Tappa '+i}" value="${esc(s.p?s.p.name:s.text)}"><div class="sug"></div></div>`;
+    {const m=document.createElement('button');m.className='ib';m.title='Scegli sulla mappa';m.textContent='🗺️';m.onclick=()=>stopMapPick(i);row.appendChild(m);}
     if(first){const b=document.createElement('button');b.className='ib';b.title='La mia posizione';b.textContent='📍 Io';b.onclick=()=>geoLocate(0);row.appendChild(b);}
     if(!first&&!last){const b=document.createElement('button');b.className='ib';b.textContent='✕';b.onclick=()=>{S.stops.splice(i,1);renderStops();};row.appendChild(b);}
     box.appendChild(row);
@@ -2058,7 +2075,7 @@ const POI_CATS=[
   {k:'passo',ic:'🏔️',n:'Passi di montagna',s:'Passo di montagna'},{k:'spa',ic:'💆',n:'SPA',s:'SPA'},{k:'agrispa',ic:'🌾💆',n:'Agriturismi con SPA',s:'Agriturismo con SPA'}];
 const FOOD_CATS=['trattoria','osteria','ristorante','agriturismo','agrispa','rifugio'];
 const DISC={items:[],state:'idle',sig:'',layer:null,
-  cats:LS.get('motorotta_disc_cats',['ristorante','agriturismo']),radius:LS.get('motorotta_disc_r',5),where:'route',sr:[0.5,1,2,5].includes(LS.get('motorotta_disc_sr',2))?LS.get('motorotta_disc_sr',2):2,pick:false};
+  cats:LS.get('motorotta_disc_cats',['ristorante','agriturismo']),radius:LS.get('motorotta_disc_r',5),where:LS.get('motorotta_disc_where','me')==='route'?'me':'me',place:null,meR:0.2,sr:[0.5,1,2,5].includes(LS.get('motorotta_disc_sr',0.5))?LS.get('motorotta_disc_sr',0.5):0.5,pick:false};
 const discStops=()=>S.stops.map((x,i)=>({i,x})).filter(o=>o.x.p).map(o=>({i:o.i,lab:o.i===0?'P':o.i===S.stops.length-1?'🏁':String(o.i),name:(o.x.p.name||o.x.text||'').split(',')[0],p:[o.x.p.lat,o.x.p.lon]}));
 const RATE_KEY='motorotta_poi_rates';
 const SEL_KEY='motorotta_poi_sel';const sels=()=>LS.get(SEL_KEY,{});
@@ -2114,14 +2131,18 @@ function poiQuery(line,R,full){
 async function discSearch(){
   const r=S.routes[S.sel];
   if(!DISC.cats.length){toast('Scegli almeno una categoria');return;}
-  if(DISC.where!=='route'){const st=discStops().find(o=>o.i===DISC.where);if(!st){DISC.where='route';toast('Tappa non trovata: scegline un’altra');renderDisc();return;}
+  if(DISC.where==='route')DISC.where='me';
+  {let st=null;
+    if(DISC.where==='me'){DISC.state='loading';renderDisc();const p=await myPos();if(!p){DISC.state='idle';renderDisc();locHelp({code:1});return;}st={p,name:'la tua posizione',me:true};}
+    else if(DISC.where==='place'){if(!DISC.place){toast('Scrivi il luogo e sceglilo dai suggerimenti');return;}st={p:DISC.place.p,name:DISC.place.name.split(',')[0]};}
+    else{st=discStops().find(o=>o.i===DISC.where);if(!st){DISC.where='me';toast('Tappa non trovata: scegline un’altra');renderDisc();return;}}
     DISC.state='loading';renderDisc();
-    try{const R=DISC.sr*1000;const j=await overpass(poiQuery(st.p[0].toFixed(5)+','+st.p[1].toFixed(5),R,true));const items=[],seen=new Set();
+    try{const R=Math.round((st.me?DISC.meR:DISC.sr)*1000);st.R=R;const j=await overpass(poiQuery(st.p[0].toFixed(5)+','+st.p[1].toFixed(5),R,true));const items=[],seen=new Set();
       (j.elements||[]).forEach(e=>{const t=e.tags||{};const lat=e.lat??(e.center&&e.center.lat),lon=e.lon??(e.center&&e.center.lon);if(lat==null)return;
         const cats=classify(t).filter(c=>DISC.cats.includes(c));if(!cats.length)return;const key=e.type[0]+e.id;if(seen.has(key))return;seen.add(key);
         const p=[lat,lon];const d=hav(st.p,p);if(d>R*1.05)return;items.push({key,cat:cats[0],p,name:t.name||t['name:it']||catOf(cats[0]).s,t,km:r?projKm(r,p).km:0,off:d,seg:0,near:st.name});});
       const spas=items.filter(i=>i.cat==='spa');items.forEach(i=>{if(i.cat==='agriturismo'&&spas.some(s=>hav(s.p,i.p)<150)&&DISC.cats.includes('agrispa'))i.cat='agrispa';});
-      DISC.items=items.sort((a,b)=>a.off-b.off).slice(0,200);DISC.around=st;DISC.state='done';DISC.sig=routeSig();
+      DISC.items=items.sort((a,b)=>a.off-b.off).slice(0,30);DISC.around=st;DISC.state='done';DISC.sig=routeSig();
     }catch(e){console.warn(e);DISC.state='error';toast('Ricerca non riuscita: riprova tra poco');}
     renderDisc();drawDiscLayer();return;}
   if(!r){toast('Calcola prima un percorso, oppure scegli una tappa');return;}
@@ -2155,7 +2176,7 @@ async function discSearch(){
   }catch(e){console.warn(e);DISC.state='error';toast('Ricerca non riuscita: riprova tra poco');}
   renderDisc();drawDiscLayer();
 }
-const routeSig=()=>{const r=S.routes[S.sel];return (r?(r.len|0)+'|'+S.sel:'')+'|'+DISC.where+'|'+DISC.sr+'|'+DISC.radius+'|'+DISC.cats.join(',');};
+const routeSig=()=>{return DISC.where+'|'+DISC.sr+'|'+DISC.meR+'|'+(DISC.place?DISC.place.name:'')+'|'+DISC.cats.join(',');};
 let selLayer=null;
 function drawSelLayer(){try{if(!selLayer)selLayer=L.layerGroup().addTo(map);selLayer.clearLayers();
   Object.entries(sels()).forEach(([k,v])=>L.marker(v.p,{icon:L.divIcon({className:'',html:`<div style="background:#fff;border:2px solid #f26b00;border-radius:12px;padding:1px 4px;font-size:15px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.4)">📌${catOf(v.cat).ic}</div>`,iconSize:[44,24],iconAnchor:[22,12]})})
@@ -2173,29 +2194,32 @@ function rateBadge(rt){if(!rt)return '';const f=rt.food?'🍴'+rt.food:'',sv=rt.
 function renderDisc(){
   const box=$('#tab-disc');if(!box)return;const r=S.routes[S.sel];
   const chips=POI_CATS.map(c=>`<button class="chip ${DISC.cats.includes(c.k)?'on':''}" data-k="${c.k}">${c.ic} ${c.n}</button>`).join('');
-  const sts=discStops();if(DISC.where!=='route'&&!sts.some(o=>o.i===DISC.where))DISC.where='route';const cur=sts.find(o=>o.i===DISC.where);
+  const sts=discStops();if(typeof DISC.where==='number'&&!sts.some(o=>o.i===DISC.where))DISC.where='me';if(DISC.where==='route')DISC.where='me';
+  const cur=sts.find(o=>o.i===DISC.where);const W=DISC.where;
+  const tgt=W==='me'?'vicino a me':W==='place'?(DISC.place?DISC.place.name.split(',')[0]:''):cur?cur.name:'';
   let h=hdCardHTML()+`<div class="card"><h3>🔎 Scopri</h3><div class="mut" style="margin-bottom:4px">1. Scegli cosa cercare</div><div class="chips">${chips}</div>
     <div class="mut" style="margin:10px 0 4px">2. Scegli dove cercare</div>
-    <select id="discW">${'<option value="route"'+(DISC.where==='route'?' selected':'')+'>🛣️ Tutto il percorso (più lento)</option>'+sts.map(o=>`<option value="${o.i}" ${DISC.where===o.i?'selected':''}>📍 Tappa ${o.lab} · ${esc(o.name)}</option>`).join('')}</select>
-    <button id="discPick" class="${DISC.pick?'okb':''}" style="margin-top:6px;width:100%">${DISC.pick?'👆 Tocca il numero della tappa sulla mappa… (annulla)':'👆 Scegli la tappa toccandola sulla mappa'}</button>
-    <div class="row" style="margin-top:8px;align-items:center"><span class="mut">${DISC.where==='route'?'Distanza dal percorso':'Raggio intorno alla tappa'}</span>
-      ${DISC.where==='route'?`<select id="discR" style="width:auto;flex:1">${[2,5,10].map(k=>`<option value="${k}" ${DISC.radius===k?'selected':''}>entro ${k} km</option>`).join('')}</select>`
+    <select id="discW"><option value="me" ${W==='me'?'selected':''}>📍 Vicino a me / dove mi sono fermato</option><option value="place" ${W==='place'?'selected':''}>🔎 Un luogo per nome…</option>${sts.map(o=>`<option value="${o.i}" ${W===o.i?'selected':''}>🏁 Tappa ${o.lab} · ${esc(o.name)}</option>`).join('')}</select>
+    ${W==='place'?`<div class="ac" style="margin-top:6px"><input type="text" id="discPlace" autocomplete="off" placeholder="Scrivi un luogo (es. Rieti centro)" value="${esc(DISC.place?DISC.place.name:'')}"><div class="sug" id="discSug"></div></div>`:''}
+    ${typeof W==='number'||sts.length?`<button id="discPick" class="${DISC.pick?'okb':''}" style="margin-top:6px;width:100%">${DISC.pick?'👆 Tocca il numero della tappa sulla mappa… (annulla)':'👆 Oppure scegli una tappa toccandola sulla mappa'}</button>`:''}
+    <div class="row" style="margin-top:8px;align-items:center"><span class="mut">Raggio</span>
+      ${W==='me'?`<b style="flex:1">entro ${DISC.meR<1?DISC.meR*1000+' m':DISC.meR+' km'}</b>${DISC.meR<0.5?'':'<button id="discMeReset" class="ib">200 m</button>'}`
         :`<select id="discSR" style="width:auto;flex:1">${[0.5,1,2,5].map(k=>`<option value="${k}" ${DISC.sr===k?'selected':''}>entro ${k<1?k*1000+' m':k+' km'}</option>`).join('')}</select>`}</div>
-    <button id="discGo" class="primary">${DISC.state==='loading'?'⏳ Cerco…':cur?'3. Cerca intorno a '+esc(cur.name):'3. Cerca lungo il percorso'}</button>
-    <div class="note" style="margin-top:6px">Dati da OpenStreetMap: indirizzi, telefoni e orari non sono sempre presenti. Voti e prezzi: i tuoi personali (e quelli degli amici che condividono il percorso) + link alle recensioni su Google Maps. ${DISC.where==='route'?'Ristoranti, trattorie e osterie: entro max 5 km dal percorso.':'Cercare intorno a una tappa è molto più veloce che su tutto il percorso.'}</div></div>`;
-  if(!r&&DISC.where==='route')h+='<div class="card empty">Calcola prima un percorso, oppure scegli una tappa.</div>';
-  else if(DISC.state==='error')h+='<div class="card empty">Ricerca non riuscita (server dei dati lento): riprova tra poco o riduci il raggio.</div>';
+    <button id="discGo" class="primary">${DISC.state==='loading'?'⏳ Cerco…':'3. Cerca '+(W==='me'?'vicino a me':tgt?'intorno a '+esc(tgt):'')}</button>
+    <div class="note" style="margin-top:6px">Dati da OpenStreetMap: indirizzi, telefoni e orari non sono sempre presenti. Voti e prezzi: i tuoi personali (e quelli degli amici che condividono il percorso) + link alle recensioni su Google Maps. Mostro i 30 risultati più vicini.</div></div>`;
+  if(DISC.state==='error')h+='<div class="card empty">Ricerca non riuscita (server dei dati lento): riprova tra poco o riduci il raggio.</div>';
   else if(DISC.state==='done'&&DISC.sig!==routeSig())h+='<div class="card empty">Filtri cambiati: premi “Cerca”.</div>';
+  else if(DISC.state==='done'&&DISC.around&&!DISC.items.length)h+=`<div class="card empty">Nessun risultato ${DISC.around.me?'entro '+DISC.around.R+' m da te':'in questa zona'}.${DISC.around.me&&DISC.meR<0.5?'<br><button id="discWiden" class="primary" style="margin-top:8px">Allarga a 500 m</button>':DISC.around.me?'':' Prova un raggio più ampio.'}</div>`;
   else if(DISC.state==='done'){
     if(!DISC.items.length)h+='<div class="card empty">Nessun luogo trovato con questi filtri.</div>';
     else{
       const st=DISC.stopsKm||[];const groups={};DISC.items.forEach(i=>(groups[i.seg]=groups[i.seg]||[]).push(i));
       Object.keys(groups).sort((a,b)=>a-b).forEach(g=>{
         const a=st[+g],b=st[+g+1];
-        h+=`<div class="card"><h3>${DISC.around?'📍 Intorno a '+esc(DISC.around.name)+' (entro '+(DISC.sr<1?DISC.sr*1000+' m':DISC.sr+' km')+') · '+DISC.items.length+' luoghi':a&&b?esc(a.name)+' → '+esc(b.name):'Lungo il percorso'}</h3>`+groups[g].sort((x,y)=>x.km-y.km).map(i=>{
+        h+=`<div class="card"><h3>${DISC.around?'📍 '+(DISC.around.me?'Vicino a te':'Intorno a '+esc(DISC.around.name))+' (entro '+(DISC.around.R<1000?DISC.around.R+' m':DISC.around.R/1000+' km')+') · '+DISC.items.length+' luoghi':a&&b?esc(a.name)+' → '+esc(b.name):'Lungo il percorso'}</h3>`+groups[g].sort((x,y)=>x.km-y.km).map(i=>{
           const c=catOf(i.cat),rt=rates()[i.key];
           return `<div class="sv" data-poi="${i.key}" style="cursor:pointer"><div style="font-size:22px;width:30px;text-align:center">${c.ic}</div><div class="n"><b>${esc(i.name)}</b> ${rateBadge(rt)}
-            <div class="mut">${c.s}${i.t.ele?' · '+Math.round(parseFloat(i.t.ele))+' m s.l.m.':''} · km ${Math.round(i.km)}${i.near?' · vicino a '+esc(i.near):''} · ${i.off<1000?Math.round(i.off)+' m':(i.off/1000).toFixed(1)+' km'} ${DISC.around?'da '+esc(DISC.around.name):'dal percorso'}${closedDays(i.t.opening_hours)?' · chiuso '+closedDays(i.t.opening_hours):''}</div></div><span class="mut">›</span></div>`;}).join('')+'</div>';
+            <div class="mut">${c.s}${i.t.ele?' · '+Math.round(parseFloat(i.t.ele))+' m s.l.m.':''} ${DISC.around?'':' · km '+Math.round(i.km)+(i.near?' · vicino a '+esc(i.near):'')} · ${i.off<1000?Math.round(i.off)+' m':(i.off/1000).toFixed(1)+' km'} ${DISC.around?(DISC.around.me?'da te':'da '+esc(DISC.around.name)):'dal percorso'}${closedDays(i.t.opening_hours)?' · chiuso '+closedDays(i.t.opening_hours):''}</div></div><span class="mut">›</span></div>`;}).join('')+'</div>';
       });
     }
   }
@@ -2203,8 +2227,14 @@ function renderDisc(){
   box.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{const k=b.dataset.k;DISC.cats=DISC.cats.includes(k)?DISC.cats.filter(x=>x!==k):[...DISC.cats,k];LS.set('motorotta_disc_cats',DISC.cats);renderDisc();});
   if($('#discR'))$('#discR').onchange=e=>{DISC.radius=+e.target.value;LS.set('motorotta_disc_r',DISC.radius);renderDisc();};
   $('#discGo').onclick=()=>{if(DISC.state!=='loading')discSearch();};hdBind();
-  $('#discW').onchange=e=>{DISC.where=e.target.value==='route'?'route':+e.target.value;DISC.pick=false;renderDisc();drawStopMarkers();};
-  $('#discPick').onclick=()=>{DISC.pick=!DISC.pick;renderDisc();if(DISC.pick){toast('Tocca il numero di una tappa sulla mappa');window.scrollTo({top:0,behavior:'smooth'});}};
+  $('#discW').onchange=e=>{const v=e.target.value;DISC.where=v==='me'||v==='place'?v:+v;DISC.pick=false;DISC.state='idle';renderDisc();drawStopMarkers();if(v==='place')setTimeout(()=>{const x=$('#discPlace');if(x)x.focus();},50);};
+  if($('#discMeReset'))$('#discMeReset').onclick=()=>{DISC.meR=0.2;renderDisc();};
+  if($('#discWiden'))$('#discWiden').onclick=()=>{DISC.meR=0.5;discSearch();};
+  if($('#discPlace')){const inp=$('#discPlace'),sug=$('#discSug');let t;inp.oninput=()=>{DISC.place=null;clearTimeout(t);const q=inp.value.trim();if(q.length<3){sug.innerHTML='';return;}
+      t=setTimeout(async()=>{try{const res=await geocode(q);sug.innerHTML='';res.forEach(p=>{const d=document.createElement('div');d.textContent=p.name;
+        d.addEventListener('pointerdown',ev=>{ev.preventDefault();inp.value=p.name;sug.innerHTML='';DISC.place={name:p.name,p:[p.lat,p.lon]};inp.blur();$('#discGo').textContent='3. Cerca intorno a '+p.name.split(',')[0];});sug.appendChild(d);});}catch(x){}},350);};
+    inp.onblur=()=>setTimeout(()=>{sug.innerHTML='';},250);}
+  if($('#discPick'))$('#discPick').onclick=()=>{DISC.pick=!DISC.pick;renderDisc();if(DISC.pick){toast('Tocca il numero di una tappa sulla mappa');window.scrollTo({top:0,behavior:'smooth'});}};
   if($('#discSR'))$('#discSR').onchange=e=>{DISC.sr=+e.target.value;LS.set('motorotta_disc_sr',DISC.sr);renderDisc();};
   box.querySelectorAll('[data-poi]').forEach(e=>e.onclick=()=>openPoi(e.dataset.poi));
 }
@@ -2936,7 +2966,7 @@ autoStart();
 if(location.hash.startsWith('#r')){try{applyPayload(b64d(location.hash.slice(2)));calc();}catch(e){console.warn(e);}}
 
 /* ================= aggiornamento automatico dell'app ================= */
-const APP_REL=23;
+const APP_REL=24;
 async function checkUpdate(){
   try{const r=await fetch('version.txt?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=parseInt((await r.text()).trim(),10);
     if(v>APP_REL){const k='motorotta_upd_try';if(LS.get(k,0)===v)return;LS.set(k,v);toast('⬇️ Nuova versione disponibile: aggiorno l’app…');
