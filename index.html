@@ -173,6 +173,10 @@ input[type=datetime-local]{width:100%;min-width:0;-webkit-appearance:none;appear
 #slSpd{background:#000;color:#fff;border-radius:10px;padding:3px 8px;font:900 18px/1.1 -apple-system,sans-serif;border:2px solid #fff}
 #slBox.over #slSign{animation:slfl .5s infinite alternate}#slBox.over #slSpd{background:#e00000}
 @keyframes slfl{from{background:#fff;color:#000}to{background:#e00000;color:#fff}}
+.stop{gap:5px!important}.stop .ac{flex:1;min-width:0}.stop>.ib{padding:8px 7px!important;min-width:38px;font-size:15px!important}.stop .dot{width:16px}.drag{width:24px;flex:none;text-align:center;font-size:22px;color:var(--mut);touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none;padding:6px 0}
+.stop.dragging{opacity:.85;box-shadow:0 6px 18px rgba(0,0,0,.45);background:var(--card);border-radius:12px;position:relative;z-index:50}
+.mv{display:flex;flex-direction:column;gap:2px;flex:none}.mv button{min-height:0!important;padding:2px 8px!important;font-size:13px!important;line-height:1.1}
+#reorderBar{display:none;margin:4px 0 8px}
 .sheet{background:var(--card);border-top:2px solid var(--acc);border-radius:18px 18px 0 0;padding:14px 14px calc(env(safe-area-inset-bottom) + 18px);width:100%;max-height:88vh;overflow:auto}
 .rrow{display:flex;align-items:center;justify-content:space-between;margin:6px 0}
 .stars span{font-size:26px;color:#555;padding:0 3px;cursor:pointer}
@@ -196,6 +200,7 @@ input[type=datetime-local]{width:100%;min-width:0;-webkit-appearance:none;appear
       <button id="gmBtn">🔗 Da Google Maps</button>
       <button id="passBtn">🏔️ Passi di montagna</button>
       <button id="tapBtn">✋ Tappe sulla mappa</button>
+      <button id="optBtn">🧭 Ordina tappe (meno strada)</button>
     </div>
     <div id="gmBox" style="display:none;margin-bottom:10px">
       <input type="text" id="gmUrl" placeholder="Incolla qui il link del percorso Google Maps">
@@ -238,7 +243,7 @@ input[type=datetime-local]{width:100%;min-width:0;-webkit-appearance:none;appear
 
   <div class="foot">
     Mappe © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · Percorsi: Valhalla (profilo moto, server FOSSGIS) e OSRM (Open Source Routing Machine) · Ricerca luoghi: Photon · Meteo: <a href="https://open-meteo.com/">Open-Meteo</a> (modelli ECMWF/ICON/GFS).<br>
-    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">Versione 22 nov 2026 · rilascio 24 (Scopri per punto, tappe dalla mappa)</b>
+    Le previsioni sono indicative: verifica sempre le condizioni reali prima di partire. La navigazione avviene in Google Maps.<br><b id="appVer">Versione 22 nov 2026 · rilascio 25 (riordino tappe)</b>
   </div>
 </main>
 </div>
@@ -457,6 +462,27 @@ function drawStopMarkers(){try{if(!stopLayer)stopLayer=L.layerGroup().addTo(map)
     mk.on('click',()=>{if(typeof DISC==='undefined'||!DISC.pick)return;DISC.where=i;DISC.pick=false;drawStopMarkers();showTab('disc');renderDisc();
       toast('📍 Tappa scelta: '+(x.p.name||'').split(',')[0]+' — ora premi “Cerca”');const t=$('#tab-disc');if(t)t.scrollIntoView({behavior:'smooth',block:'start'});});
     mk.addTo(stopLayer);});}catch(e){}}
+/* ================= riordino delle tappe ================= */
+function moveStop(a,b){if(b<0||b>=S.stops.length||a===b)return;const x=S.stops.splice(a,1)[0];S.stops.splice(b,0,x);renderStops();reorderDirty();}
+function reorderDirty(){if(!S.routes.length)return;let bar=$('#reorderBar');if(!bar){bar=document.createElement('div');bar.id='reorderBar';$('#stops').after(bar);}
+  bar.innerHTML='<button class="primary" id="reCalc">🔄 Ricalcola con il nuovo ordine</button>';bar.style.display='block';$('#reCalc').onclick=()=>{bar.style.display='none';S.userCalc=true;calc();};}
+function dragStop(h,row,i){let y0=0,dy=0,rows=[],on=false;
+  h.addEventListener('pointerdown',e=>{e.preventDefault();on=true;y0=e.clientY;dy=0;rows=[...$('#stops').children].map(r=>{const b=r.getBoundingClientRect();return (b.top+b.bottom)/2;});
+    row.classList.add('dragging');try{h.setPointerCapture(e.pointerId);}catch(x){}});
+  h.addEventListener('pointermove',e=>{if(!on)return;dy=e.clientY-y0;row.style.transform=`translateY(${dy}px)`;});
+  const end=()=>{if(!on)return;on=false;row.classList.remove('dragging');row.style.transform='';const y=rows[i]+dy;const t=rows.filter((m,k)=>k!==i&&m<y).length;if(Math.abs(dy)>12&&t!==i)moveStop(i,t);};
+  h.addEventListener('pointerup',end);h.addEventListener('pointercancel',end);}
+/* ordine intelligente delle tappe intermedie (partenza e arrivo restano fissi) */
+function optimizeStops(){const st=S.stops;if(st.some(x=>!x.p)){toast('Completa prima tutte le tappe');return;}if(st.length<4){toast('Servono almeno 2 tappe intermedie');return;}
+  const P=st.map(x=>[x.p.lat,x.p.lon]);const loop=hav(P[0],P[P.length-1])<1500;const D=(a,b)=>hav(P[a],P[b]);
+  const mid=[...Array(st.length-2).keys()].map(k=>k+1);let ord=[0];const left=new Set(mid);
+  while(left.size){const c=ord[ord.length-1];let best=null,bd=Infinity;left.forEach(k=>{const d=D(c,k);if(d<bd){bd=d;best=k;}});ord.push(best);left.delete(best);}ord.push(st.length-1);
+  const len=o=>o.reduce((a,k,j)=>j?a+D(o[j-1],k):0,0);let imp=true,g=0;
+  while(imp&&g++<200){imp=false;for(let a=1;a<ord.length-2;a++)for(let b=a+1;b<ord.length-1;b++){const n=ord.slice(0,a).concat(ord.slice(a,b+1).reverse(),ord.slice(b+1));if(len(n)<len(ord)-1){ord=n;imp=true;}}}
+  const before=len([...Array(st.length).keys()]),after=len(ord);
+  if(after>=before-100){toast('L’ordine attuale è già il più corto');return;}
+  S.stops=ord.map(k=>st[k]);renderStops();reorderDirty();toast(`🧭 Tappe riordinate: circa ${Math.round((before-after)/1000)} km in meno in linea d’aria`);}
+
 /* scelta di una tappa dalla mappa: doppio tocco sul punto */
 let PICK={t:0,pt:null};
 function stopMapPick(i){if(S.tapMode)setTapMode(false);S.mapPick=i;PICK={t:0,pt:null};try{map.doubleClickZoom.disable();}catch(e){}
@@ -483,10 +509,13 @@ function renderStops(){setTimeout(drawStopMarkers,0);
   S.stops.forEach((s,i)=>{
     const last=i===S.stops.length-1, first=i===0;
     const row=document.createElement('div');row.className='stop';
-    row.innerHTML=`<span class="dot">${first?'🟢':last?'🏁':'🔸'}</span><div class="ac"><input type="text" autocomplete="off" placeholder="${first?'Partenza':last?'Destinazione':'Tappa '+i}" value="${esc(s.p?s.p.name:s.text)}"><div class="sug"></div></div>`;
+    row.innerHTML=`<span class="drag" title="Trascina per spostare">☰</span><span class="dot">${first?'🟢':last?'🏁':'🔸'}</span><div class="ac"><input type="text" autocomplete="off" placeholder="${first?'Partenza':last?'Destinazione':'Tappa '+i}" value="${esc(s.p?s.p.name:s.text)}"><div class="sug"></div></div>`;
     {const m=document.createElement('button');m.className='ib';m.title='Scegli sulla mappa';m.textContent='🗺️';m.onclick=()=>stopMapPick(i);row.appendChild(m);}
     if(first){const b=document.createElement('button');b.className='ib';b.title='La mia posizione';b.textContent='📍 Io';b.onclick=()=>geoLocate(0);row.appendChild(b);}
-    if(!first&&!last){const b=document.createElement('button');b.className='ib';b.textContent='✕';b.onclick=()=>{S.stops.splice(i,1);renderStops();};row.appendChild(b);}
+    if(!first&&!last){const b=document.createElement('button');b.className='ib';b.textContent='✕';b.onclick=()=>{S.stops.splice(i,1);renderStops();reorderDirty();};row.appendChild(b);}
+    {const mv=document.createElement('div');mv.className='mv';mv.innerHTML=`<button class="ib" ${first?'disabled style="opacity:.3"':''}>▲</button><button class="ib" ${last?'disabled style="opacity:.3"':''}>▼</button>`;
+      mv.children[0].onclick=()=>moveStop(i,i-1);mv.children[1].onclick=()=>moveStop(i,i+1);row.appendChild(mv);}
+    dragStop(row.querySelector('.drag'),row,i);
     box.appendChild(row);
     const inp=row.querySelector('input'),sug=row.querySelector('.sug');
     attachAC(inp,sug,(p,txt)=>{s.p=p;s.text=txt;},i);
@@ -718,7 +747,7 @@ async function resolveStops(){
     if(!s.p&&s.text&&s.text.trim()){const r=await geocode(s.text.trim(),1);if(r[0])s.p=r[0];}
   }
 }
-$('#go').onclick=()=>{S.userCalc=true;calc();};
+$('#go').onclick=()=>{S.userCalc=true;const rb=$('#reorderBar');if(rb)rb.style.display='none';calc();};$('#optBtn').onclick=optimizeStops;
 async function calc(){
   const btn=$('#go');btn.disabled=true;
   try{
@@ -2966,7 +2995,7 @@ autoStart();
 if(location.hash.startsWith('#r')){try{applyPayload(b64d(location.hash.slice(2)));calc();}catch(e){console.warn(e);}}
 
 /* ================= aggiornamento automatico dell'app ================= */
-const APP_REL=24;
+const APP_REL=25;
 async function checkUpdate(){
   try{const r=await fetch('version.txt?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=parseInt((await r.text()).trim(),10);
     if(v>APP_REL){const k='motorotta_upd_try';if(LS.get(k,0)===v)return;LS.set(k,v);toast('⬇️ Nuova versione disponibile: aggiorno l’app…');
